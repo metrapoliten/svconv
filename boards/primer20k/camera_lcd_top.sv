@@ -4,7 +4,7 @@
 // на Tang Primer 20K + Dock.
 //
 // Тактовые сигналы:
-//   clk27   — генератор платы: настройка камеры, кнопка, светодиоды; он же XCLK камеры;
+//   clk27   — генератор платы: настройка камеры, светодиоды; он же XCLK камеры;
 //   PCLK    — от камеры (при XCLK = 27 МГц и таблице регистров ov7670_init — 27 МГц):
 //             захват и вся обработка;
 //   lcd_clk — пиксельная частота дисплея от PLL (rPLL).
@@ -14,9 +14,9 @@
 // TangPrimer-20K-example (RGB_lcd). Для удобства есть обёртки camera_lcd_43_top и
 // camera_lcd_50_top.
 //
-// Кнопка T10 переключает режим цепочки по кругу:
-//   0 — размытие -> размытие -> границы (по заданию), 1 — без обработки,
-//   2 — только размытие, 3 — только границы.
+// Каскады цепочки «размытие -> размытие -> границы» включаются DIP-переключателями дока
+// DIP2, DIP3, DIP4 (вверх — каскад включён); все выключены — на экране серый кадр камеры.
+// DIP1 не используется: он подключён к RECONFIG_N ПЛИС. DIP5 свободен.
 //
 // Светодиоды дока (по шелкографии, горят при 0 на выводе):
 //   LED2 — мигает раз в секунду, LED3 — камера настроена, LED4 — переключается на каждом
@@ -25,7 +25,7 @@ module camera_lcd_top #(
     parameter int unsigned LcdPreset = 0
 ) (
     input logic clk27_i,
-    input logic btn_n_i,  // кнопка T10, активный 0
+    input logic [2:0] dip_i,  // DIP2..DIP4: включение каскадов 0..2
 
     // Камера.
     inout  wire        cam_scl_io,
@@ -156,45 +156,20 @@ module camera_lcd_top #(
   assign cam_scl_io = sioc_oe ? 1'b0 : 1'bz;
   assign cam_sda_io = siod_oe ? 1'b0 : 1'bz;
 
-  // --- Режим цепочки: кнопка в домене clk27 ----------------------------------------------
-  logic btn_press;
-  logic [1:0] mode_q;
-
-  button #(
-      .StableClks(ClkFreq / 100),
-      .ActiveLow (1'b1)
-  ) u_button (
-      .clk_i    (clk27_i),
-      .rst_i    (rst),
-      .btn_i    (btn_n_i),
-      .pressed_o(),
-      .press_o  (btn_press)
-  );
-
-  always_ff @(posedge clk27_i) begin
-    if (rst) mode_q <= '0;
-    else if (btn_press) mode_q <= mode_q + 1'b1;
-  end
-
+  // --- Конфигурация цепочки -------------------------------------------------------------
   // Номера ядер — порядок KERNEL_ROM_ORDER в модели: 0 identity, 1 gauss5, 2 log5.
   localparam int unsigned SelW = 2;
-  logic [       2:0] stage_en;
+  localparam logic [3*SelW-1:0] KernelSel = {
+    2'd2, 2'd1, 2'd1
+  };  // границы, размытие, размытие
+  logic [2:0] stage_en;
   logic [3*SelW-1:0] kernel_sel;
 
-  always_comb begin
-    unique case (mode_q)
-      2'd0:
-      {stage_en, kernel_sel} = {
-        3'b111, 2'd2, 2'd1, 2'd1
-      };  // размытие, размытие, границы
-      2'd1: {stage_en, kernel_sel} = {3'b000, 2'd0, 2'd0, 2'd0};  // без обработки
-      2'd2: {stage_en, kernel_sel} = {3'b001, 2'd0, 2'd0, 2'd1};  // только размытие
-      default: {stage_en, kernel_sel} = {3'b100, 2'd2, 2'd0, 2'd0};  // только границы
-    endcase
-  end
+  assign stage_en   = dip_i;
+  assign kernel_sel = KernelSel;
 
-  // Домен PCLK: синхронизация сброса и режима (режим меняется редко; кадр, во время
-  // которого он сменился, может быть смешанным).
+  // Домен PCLK: синхронизация сброса и конфигурации (переключатели асинхронны и меняются
+  // редко; кадр, во время которого конфигурация сменилась, может быть смешанным).
   logic [1:0] rst_pclk_q;
   logic [8:0] cfg_meta_q, cfg_q;
 
@@ -278,7 +253,7 @@ endmodule
 // Обёртки с выбранным дисплеем.
 module camera_lcd_43_top (
     input  logic       clk27_i,
-    input  logic       btn_n_i,
+    input  logic [2:0] dip_i,
     inout  wire        cam_scl_io,
     inout  wire        cam_sda_io,
     input  logic       cam_pclk_i,
@@ -302,7 +277,7 @@ endmodule
 
 module camera_lcd_50_top (
     input  logic       clk27_i,
-    input  logic       btn_n_i,
+    input  logic [2:0] dip_i,
     inout  wire        cam_scl_io,
     inout  wire        cam_sda_io,
     input  logic       cam_pclk_i,

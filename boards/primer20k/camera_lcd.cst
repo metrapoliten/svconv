@@ -1,22 +1,31 @@
-// Ограничения пинов camera_lcd_top (Tang Primer 20K + Dock ext-board). Все пины — 3,3 В.
-// ВНИМАНИЕ: перед подключением модуля OV7670 к разъёму 24P сверить его распиновку и питание
-// с разъёмом дока (рассчитан на модули OV2640/OV5640).
+// Ограничения пинов camera_lcd_top (Tang Primer 20K + Dock ext-board). Пины — 3,3 В, кроме DIP (1,5 В).
+// Камера: разъём 24P дока (схема дока 3713, лист «DVP Carmera») — распиновка OV2640/OV5640,
+// питание с дока: AVDD 3,0 В, DOVDD 2,8 В, DVDD 1,5 В. Сигналы камеры согласованы по уровням на
+// доке: XCLK — через 74LVC1T45, RESET/PWDN — делители 10K/56K, SIOC/SIOD — ключи 2N7002 с
+// подтяжкой 5,1K к 2,8 В на стороне камеры. Перед подключением OV7670 сверить его DVDD (1,8 В).
 
 
 // Генератор 27 МГц.
 IO_LOC "clk27_i" H11;
 IO_PORT "clk27_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 
-// Кнопка T10 (единственная кнопка дока в банке 3,3 В), активный 0.
-IO_LOC "btn_n_i" T10;
-IO_PORT "btn_n_i" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+// DIP-переключатели дока DIP2..DIP4 (схема дока 3713, лист «Things»): банк 4 — 1,5 В; включённый
+// переключатель подаёт ~1,3 В через 1,5K, выключенный — подтяжка 13K к земле.
+// DIP1 подключён к RECONFIG_N (B10) и здесь не используется.
+IO_LOC "dip_i[0]" E9;
+IO_PORT "dip_i[0]" IO_TYPE=LVCMOS15 PULL_MODE=NONE BANK_VCCIO=1.5;
+IO_LOC "dip_i[1]" E8;
+IO_PORT "dip_i[1]" IO_TYPE=LVCMOS15 PULL_MODE=NONE BANK_VCCIO=1.5;
+IO_LOC "dip_i[2]" T5;
+IO_PORT "dip_i[2]" IO_TYPE=LVCMOS15 PULL_MODE=NONE BANK_VCCIO=1.5;
 
-// Камера, DVP-разъём 24P дока (пины — из примеров Sipeed Cam2lcd/Cam2HDMI).
-// SCCB — открытый сток без подтяжки ПЛИС: высокий уровень дают резисторы модуля камеры.
+// Камера, DVP-разъём 24P дока (пины — из примеров Sipeed Cam2lcd/Cam2HDMI, сверены со схемой).
+// SCCB — открытый сток; на стороне ПЛИС у преобразователя уровня нет подтяжки, поэтому включена
+// внутренняя подтяжка ПЛИС (3,3 В, сторона ПЛИС) — без неё линию нельзя читать.
 IO_LOC "cam_scl_io" F14;
-IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
 IO_LOC "cam_sda_io" F16;
-IO_PORT "cam_sda_io" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_PORT "cam_sda_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
 IO_LOC "cam_pclk_i" F13;
 IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 IO_LOC "cam_vsync_i" G15;
