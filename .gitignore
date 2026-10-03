@@ -1,0 +1,22 @@
+# Gowin EDA: результаты синтеза и размещения, битстримы, локальные настройки проекта
+impl/
+*.fs
+*.gprj.user
+
+# Симуляция (iverilog, cocotb)
+sim_build/
+*.vvp
+*.vcd
+*.fst
+results.xml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Редакторы
+.vscode/
+.idea/
