@@ -8,7 +8,7 @@ import random
 
 import numpy as np
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import ClockCycles, RisingEdge
 
 # Значение неопределённого (X/Z) выходного пикселя.
 UNDEFINED = -1
@@ -93,3 +93,32 @@ def unpack_weights(value: int, k: int) -> np.ndarray:
     """Обратное к pack_weights: вектор весов -> знаковая матрица K×K."""
     raw = [(value >> (8 * idx)) & 0xFF for idx in range(k * k)]
     return np.array([b - 256 if b > 127 else b for b in raw]).reshape(k, k)
+
+
+async def uart_send(dut, line, data: bytes, clks_per_bit: int) -> None:
+    """Передаёт байты по линии line (8N1), длина бита — clks_per_bit тактов dut.clk_i."""
+    for byte in data:
+        for bit in [0] + [(byte >> i) & 1 for i in range(8)] + [1]:
+            line.value = bit
+            await ClockCycles(dut.clk_i, clks_per_bit)
+
+
+async def uart_recv(dut, line, count: int, clks_per_bit: int, timeout_bits: int = 1000) -> bytes:
+    """Принимает count байт с линии line (8N1), выбирая биты в их серединах."""
+    out = bytearray()
+    for _ in range(count):
+        idle = 0
+        while line.value == 1:
+            await RisingEdge(dut.clk_i)
+            idle += 1
+            assert idle < timeout_bits * clks_per_bit, f"UART: no start bit, got {len(out)} bytes"
+        await ClockCycles(dut.clk_i, clks_per_bit // 2)
+        assert line.value == 0, "UART: start bit too short"
+        byte = 0
+        for i in range(8):
+            await ClockCycles(dut.clk_i, clks_per_bit)
+            byte |= int(line.value) << i
+        await ClockCycles(dut.clk_i, clks_per_bit)
+        assert line.value == 1, "UART: no stop bit"
+        out.append(byte)
+    return bytes(out)
