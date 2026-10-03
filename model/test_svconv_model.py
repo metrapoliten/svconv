@@ -16,6 +16,7 @@ from svconv_model import (
     postprocess,
     rgb565_to_rgb888,
     rgb888_to_gray,
+    sample_image,
 )
 
 RNG = np.random.default_rng(2026)
@@ -132,3 +133,12 @@ def test_kernel_rom_layout() -> None:
         assert weights == kernel.weights.flatten().tolist()
         assert record[-1] & 0x0F == kernel.shift
         assert bool(record[-1] & 0x80) == (kernel.mode == "abs")
+
+
+@pytest.mark.parametrize("size", [(160, 120), (16, 12)])
+def test_sample_image_is_deterministic_and_varied(size: tuple[int, int]) -> None:
+    w, h = size
+    img = sample_image(w, h)
+    assert img.shape == (h, w) and img.dtype == np.uint8
+    np.testing.assert_array_equal(img, sample_image(w, h))
+    assert len(np.unique(img)) > 8

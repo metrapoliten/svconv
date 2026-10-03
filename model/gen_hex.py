@@ -2,6 +2,7 @@
 
     python3 model/gen_hex.py kernels --k 5 -o kernels.hex
     python3 model/gen_hex.py image photo.png --size 160x120 -o image.hex
+    python3 model/gen_hex.py pattern --size 160x120 -o image.hex
 
 Формат: по одному байту на строку, две шестнадцатеричные цифры.
 """
@@ -12,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from svconv_model import kernel_rom_bytes, rgb888_to_gray
+from svconv_model import kernel_rom_bytes, rgb888_to_gray, sample_image
 
 
 def write_hex(path: Path, data: list[int]) -> None:
@@ -32,9 +33,16 @@ def main() -> None:
     image.add_argument("--size", default="160x120", help="width x height")
     image.add_argument("-o", "--output", type=Path, required=True)
 
+    pattern = sub.add_parser("pattern", help="sample_image() test image from the model")
+    pattern.add_argument("--size", default="160x120", help="width x height")
+    pattern.add_argument("-o", "--output", type=Path, required=True)
+
     args = parser.parse_args()
     if args.what == "kernels":
         write_hex(args.output, kernel_rom_bytes(args.k))
+    elif args.what == "pattern":
+        w, h = (int(v) for v in args.size.split("x"))
+        write_hex(args.output, [int(v) for v in sample_image(w, h).flatten()])
     else:
         w, h = (int(v) for v in args.size.split("x"))
         rgb = np.asarray(Image.open(args.input).convert("RGB").resize((w, h)))

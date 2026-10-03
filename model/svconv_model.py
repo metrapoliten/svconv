@@ -117,6 +117,21 @@ def kernel_rom_bytes(k: int) -> list[int]:
     return rom
 
 
+def sample_image(width: int, height: int) -> np.ndarray:
+    """Детерминированное тестовое изображение в оттенках серого (uint8, height×width):
+    диагональный градиент, светлый прямоугольник, тёмный круг и тонкие линии — на нём
+    хорошо видны и размытие, и выделение границ. Масштабируется под любой размер кадра."""
+    y, x = np.mgrid[0:height, 0:width]
+    img = (x * 160 // max(width - 1, 1) + y * 95 // max(height - 1, 1)).astype(np.int64)
+    rect = (x >= width // 8) & (x < width * 3 // 8) & (y >= height // 4) & (y < height * 3 // 4)
+    img[rect] = 240
+    cx, cy, r = width * 5 // 8, height // 2, min(width, height) // 4
+    img[(x - cx) ** 2 + (y - cy) ** 2 < r * r] = 30
+    img[:, width * 7 // 8] = 255
+    img[height * 7 // 8, :] = 0
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
 def rgb565_to_rgb888(pix: np.ndarray) -> np.ndarray:
     """RGB565 (uint16, H×W) -> RGB888 (uint8, H×W×3).
 
