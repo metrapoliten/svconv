@@ -206,3 +206,22 @@ def pipeline(img: np.ndarray, kernels: list[Kernel]) -> np.ndarray:
     for kernel in kernels:
         img = convolve(img, kernel)
     return img
+
+
+def gray_to_rgb565(img: np.ndarray) -> np.ndarray:
+    """Оттенки серого (uint8) -> RGB565 (uint16) с R = G = B, как на выходе lcd_frame_reader."""
+    g = np.asarray(img, dtype=np.uint16)
+    return ((g >> 3) << 11) | ((g >> 2) << 5) | (g >> 3)
+
+
+def display_frame(img: np.ndarray, width: int, height: int, scale: int) -> np.ndarray:
+    """Что видно на экране width×height (RGB565): img, увеличенное в scale раз повторением
+    пикселей и размещённое по центру (смещения округляются вниз), вокруг — чёрный."""
+    big = np.kron(np.asarray(img, dtype=np.uint8), np.ones((scale, scale), dtype=np.uint8))
+    h, w = big.shape
+    if w > width or h > height:
+        raise ValueError(f"scaled image {w}x{h} does not fit the display {width}x{height}")
+    screen = np.zeros((height, width), dtype=np.uint16)
+    off_x, off_y = (width - w) // 2, (height - h) // 2
+    screen[off_y : off_y + h, off_x : off_x + w] = gray_to_rgb565(big)
+    return screen

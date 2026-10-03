@@ -10,6 +10,8 @@ from svconv_model import (
     Kernel,
     conv2d_acc,
     convolve,
+    display_frame,
+    gray_to_rgb565,
     kernel_rom_bytes,
     pad_kernel,
     pipeline,
@@ -142,3 +144,18 @@ def test_sample_image_is_deterministic_and_varied(size: tuple[int, int]) -> None
     assert img.shape == (h, w) and img.dtype == np.uint8
     np.testing.assert_array_equal(img, sample_image(w, h))
     assert len(np.unique(img)) > 8
+
+
+def test_gray_to_rgb565() -> None:
+    np.testing.assert_array_equal(gray_to_rgb565(np.array([0, 255, 128])), [0x0000, 0xFFFF, 0x8410])
+
+
+def test_display_frame_scales_and_centers() -> None:
+    img = np.array([[10, 20], [30, 40]], dtype=np.uint8)
+    screen = display_frame(img, 7, 6, scale=2)
+    # Картинка 4×4 со смещением ((7-4)//2, (6-4)//2) = (1, 1).
+    assert screen.shape == (6, 7)
+    assert screen[1, 1] == screen[2, 2] == gray_to_rgb565(np.array([10]))[0]
+    assert screen[1, 3] == gray_to_rgb565(np.array([20]))[0]
+    assert screen[4, 4] == gray_to_rgb565(np.array([40]))[0]
+    assert screen[0].sum() == 0 and screen[:, 0].sum() == 0 and screen[:, 5:].sum() == 0
