@@ -7,7 +7,7 @@ set_device GW2A-LV18PG256C8/I7 -device_version C
 
 foreach f {
   util/uart_tx.sv util/uart_rx.sv
-  core/sdp_ram.sv core/kernel_rom.sv core/conv2d_stage.sv core/conv_pipeline.sv
+  core/sdp_ram.sv core/kernel_rom.sv core/conv_postprocess.sv core/conv2d_stage.sv core/conv_pipeline.sv
   bench/frame_rom_source.sv bench/uart_bench.sv
 } {
   add_file "$rtl_dir/$f"

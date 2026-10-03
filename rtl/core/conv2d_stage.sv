@@ -211,17 +211,16 @@ module conv2d_stage #(
   // ---------------------------------------------------------------------------------------
   // 6) Постобработка: модуль, округление половины вверх, сдвиг, насыщение до 0..255.
   // ---------------------------------------------------------------------------------------
-  logic signed [AccW:0] mag, rounded, scaled;
   logic [7:0] pixel;
 
-  always_comb begin
-    mag = (abs_i && sum_q < 0) ? -(AccW + 1)'(sum_q) : (AccW + 1)'(sum_q);
-    rounded = (shift_i == 0) ? mag : mag + ((AccW + 1)'(1) <<< (shift_i - 1));
-    scaled = rounded >>> shift_i;
-    if (scaled < 0) pixel = 8'd0;
-    else if (scaled > 255) pixel = 8'd255;
-    else pixel = scaled[7:0];
-  end
+  conv_postprocess #(
+      .AccW(AccW)
+  ) u_post (
+      .sum_i  (sum_q),
+      .shift_i(shift_i),
+      .abs_i  (abs_i),
+      .pixel_o(pixel)
+  );
 
   // ---------------------------------------------------------------------------------------
   // Признаки, сопровождающие пиксель по конвейеру: valid, sof и «край» — сдвиговые регистры.

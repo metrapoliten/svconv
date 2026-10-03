@@ -8,7 +8,7 @@ set top $::env(TOP)
 set_device GW2A-LV18PG256C8/I7 -device_version C
 
 foreach f {
-  core/sdp_ram.sv core/kernel_rom.sv core/conv2d_stage.sv core/conv_pipeline.sv
+  core/sdp_ram.sv core/kernel_rom.sv core/conv_postprocess.sv core/conv2d_stage.sv core/conv_pipeline.sv
   core/rgb565_to_gray.sv core/frame_decimator.sv
   video/video_timing.sv video/frame_buffer.sv video/lcd_frame_reader.sv video/lcd_output.sv
   camera/sccb_writer.sv camera/ov7670_init.sv camera/dvp_capture.sv camera/camera_display.sv

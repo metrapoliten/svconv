@@ -11,7 +11,7 @@ HEIGHT ?= 12
 K      ?= 5
 export WIDTH HEIGHT K
 
-VERILOG_SOURCES     := $(ROOT)/rtl/core/sdp_ram.sv $(ROOT)/rtl/core/conv2d_stage.sv
+VERILOG_SOURCES     := $(ROOT)/rtl/core/sdp_ram.sv $(ROOT)/rtl/core/conv_postprocess.sv $(ROOT)/rtl/core/conv2d_stage.sv
 COCOTB_TOPLEVEL     := conv2d_stage
 COCOTB_TEST_MODULES := test_conv2d_stage
 COMPILE_ARGS += -Pconv2d_stage.Width=$(WIDTH) -Pconv2d_stage.Height=$(HEIGHT) -Pconv2d_stage.K=$(K)
