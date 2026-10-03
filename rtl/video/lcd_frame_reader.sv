@@ -1,8 +1,9 @@
 `timescale 1ns / 1ps
 
 // Вывод кадра SrcWidth×SrcHeight из кадрового буфера на RGB-дисплей с целочисленным
-// увеличением Scale и по центру экрана; вне картинки — чёрный цвет. Пиксели в оттенках серого
-// выводятся как RGB565 (R = G = B).
+// увеличением Scale и по центру экрана; вне картинки — чёрный цвет. Пиксель в оттенках серого
+// выводится во всех трёх цветах (R = G = B): RBits/GBits/BBits старших бит (RGB565 — 5/6/5,
+// RGB666 — 6/6/6, RGB888 — 8/8/8).
 //
 // По координатам от video_timing вычисляется адрес в буфере: (y - OffY) / Scale * SrcWidth +
 // (x - OffX) / Scale. Деление — на константу: для степеней двойки это просто сдвиг.
@@ -16,6 +17,9 @@ module lcd_frame_reader #(
     parameter int unsigned SrcWidth = 160,
     parameter int unsigned SrcHeight = 120,
     parameter int unsigned Scale = 2,
+    parameter int unsigned RBits = 5,
+    parameter int unsigned GBits = 6,
+    parameter int unsigned BBits = 5,
     localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight)
 ) (
     input logic clk_i,  // пиксельная частота
@@ -32,12 +36,12 @@ module lcd_frame_reader #(
     input  logic [      7:0] fb_data_i,
 
     // Выход на дисплей.
-    output logic       hsync_o,
-    output logic       vsync_o,
-    output logic       de_o,
-    output logic [4:0] r_o,
-    output logic [5:0] g_o,
-    output logic [4:0] b_o
+    output logic             hsync_o,
+    output logic             vsync_o,
+    output logic             de_o,
+    output logic [RBits-1:0] r_o,
+    output logic [GBits-1:0] g_o,
+    output logic [BBits-1:0] b_o
 );
 
   localparam int unsigned OutW = SrcWidth * Scale;
@@ -77,9 +81,9 @@ module lcd_frame_reader #(
     hsync_o <= hsync_q;
     vsync_o <= vsync_q;
     de_o    <= de_q;
-    r_o     <= in_image_q ? fb_data_i[7:3] : '0;
-    g_o     <= in_image_q ? fb_data_i[7:2] : '0;
-    b_o     <= in_image_q ? fb_data_i[7:3] : '0;
+    r_o     <= in_image_q ? fb_data_i[7-:RBits] : '0;
+    g_o     <= in_image_q ? fb_data_i[7-:GBits] : '0;
+    b_o     <= in_image_q ? fb_data_i[7-:BBits] : '0;
   end
 
 endmodule

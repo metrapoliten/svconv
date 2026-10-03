@@ -12,7 +12,10 @@ module lcd_output_tb #(
     parameter int unsigned VBack = 4,
     parameter int unsigned SrcWidth = 16,
     parameter int unsigned SrcHeight = 12,
-    parameter int unsigned Scale = 2
+    parameter int unsigned Scale = 2,
+    parameter int unsigned RBits = 5,
+    parameter int unsigned GBits = 6,
+    parameter int unsigned BBits = 5
 ) (
     input logic       clk_w_i,
     input logic       rst_w_i,
@@ -20,14 +23,14 @@ module lcd_output_tb #(
     input logic       sof_i,
     input logic [7:0] data_i,
 
-    input  logic       clk_pix_i,
-    input  logic       rst_pix_i,
-    output logic       hsync_o,
-    output logic       vsync_o,
-    output logic       de_o,
-    output logic [4:0] r_o,
-    output logic [5:0] g_o,
-    output logic [4:0] b_o
+    input  logic             clk_pix_i,
+    input  logic             rst_pix_i,
+    output logic             hsync_o,
+    output logic             vsync_o,
+    output logic             de_o,
+    output logic [RBits-1:0] r_o,
+    output logic [GBits-1:0] g_o,
+    output logic [BBits-1:0] b_o
 );
 
   localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight);
@@ -62,7 +65,10 @@ module lcd_output_tb #(
       .VSyncPol (1'b0),
       .SrcWidth (SrcWidth),
       .SrcHeight(SrcHeight),
-      .Scale    (Scale)
+      .Scale    (Scale),
+      .RBits    (RBits),
+      .GBits    (GBits),
+      .BBits    (BBits)
   ) u_lcd (
       .clk_i    (clk_pix_i),
       .rst_i    (rst_pix_i),

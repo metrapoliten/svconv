@@ -16,6 +16,7 @@ H_TOTAL = H_ACTIVE + H_FRONT + H_SYNC + H_BACK
 V_TOTAL = V_ACTIVE + V_FRONT + V_SYNC + V_BACK
 SRC_W, SRC_H = 16, 12
 SCALE = int(os.environ["SCALE"])
+BITS = tuple(int(v) for v in os.environ["BITS"].split(","))
 
 
 async def write_frame(dut, img: np.ndarray) -> None:
@@ -38,9 +39,9 @@ async def capture_screen(dut) -> np.ndarray:
             break
         if dut.de_o.value == 1:
             r, g, b = int(dut.r_o.value), int(dut.g_o.value), int(dut.b_o.value)
-            pixels.append((r << 11) | (g << 5) | b)
+            pixels.append((r << (BITS[1] + BITS[2])) | (g << BITS[2]) | b)
     assert len(pixels) == H_ACTIVE * V_ACTIVE, f"de pixels per frame: {len(pixels)}"
-    return np.array(pixels, dtype=np.uint16).reshape(V_ACTIVE, H_ACTIVE)
+    return np.array(pixels, dtype=np.uint32).reshape(V_ACTIVE, H_ACTIVE)
 
 
 async def setup(dut) -> None:
@@ -64,7 +65,7 @@ async def shows_scaled_centered_frame(dut):
     img = sample_image(SRC_W, SRC_H)
     await write_frame(dut, img)
     screen = await capture_screen(dut)
-    expected = display_frame(img, H_ACTIVE, V_ACTIVE, SCALE)
+    expected = display_frame(img, H_ACTIVE, V_ACTIVE, SCALE, BITS)
     bad = np.argwhere(screen != expected)
     assert not len(bad), (
         f"{len(bad)} mismatching screen pixels, first at {tuple(int(v) for v in bad[0])}: "
@@ -129,5 +130,5 @@ async def write_restarts_at_sof(dut):
     img = sample_image(SRC_W, SRC_H)
     await write_frame(dut, img)
     screen = await capture_screen(dut)
-    expected = display_frame(img, H_ACTIVE, V_ACTIVE, SCALE)
+    expected = display_frame(img, H_ACTIVE, V_ACTIVE, SCALE, BITS)
     assert (screen == expected).all(), f"{int((screen != expected).sum())} mismatching pixels"

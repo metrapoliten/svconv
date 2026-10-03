@@ -2,13 +2,12 @@
 
 // Обработка видео с камеры и вывод на RGB-LCD (не зависит от платы):
 //
-//   домен PCLK камеры:  dvp_capture -> frame_decimator -> rgb565_to_gray -> conv_pipeline
+//   домен PCLK камеры:  camera_pipeline (захват, прореживание, серый, свёртки)
 //                       -> запись в frame_buffer
 //   домен пикселей LCD: lcd_output читает frame_buffer
 //
-// Кадр камеры (RGB565) прореживается в Factor раз до Width×Height, переводится в оттенки
-// серого и проходит цепочку свёрток. Конфигурация цепочки (stage_en_i, kernel_sel_i) задаётся
-// в домене PCLK; её следует менять редко (см. conv_pipeline).
+// Конфигурация цепочки (stage_en_i, kernel_sel_i) задаётся в домене PCLK; её следует менять
+// редко (см. conv_pipeline). Формат цвета дисплея — RBits/GBits/BBits.
 module camera_display #(
     // Обработка.
     parameter int unsigned Width = 160,
@@ -32,7 +31,10 @@ module camera_display #(
     parameter int unsigned VBack = 2,
     parameter bit HSyncPol = 1'b0,
     parameter bit VSyncPol = 1'b0,
-    parameter int unsigned Scale = 2
+    parameter int unsigned Scale = 2,
+    parameter int unsigned RBits = 5,
+    parameter int unsigned GBits = 6,
+    parameter int unsigned BBits = 5
 ) (
     // Камера.
     input logic       pclk_i,
@@ -47,91 +49,46 @@ module camera_display #(
     output logic frame_o,  // импульс на каждый обработанный кадр
 
     // Дисплей.
-    input  logic       lcd_clk_i,
-    input  logic       rst_lcd_i,    // синхронный сброс в домене LCD
-    output logic       lcd_hsync_o,
-    output logic       lcd_vsync_o,
-    output logic       lcd_de_o,
-    output logic [4:0] lcd_r_o,
-    output logic [5:0] lcd_g_o,
-    output logic [4:0] lcd_b_o
+    input  logic             lcd_clk_i,
+    input  logic             rst_lcd_i,    // синхронный сброс в домене LCD
+    output logic             lcd_hsync_o,
+    output logic             lcd_vsync_o,
+    output logic             lcd_de_o,
+    output logic [RBits-1:0] lcd_r_o,
+    output logic [GBits-1:0] lcd_g_o,
+    output logic [BBits-1:0] lcd_b_o
 );
 
   localparam int unsigned AddrW = $clog2(Width * Height);
 
   // --- Домен PCLK -------------------------------------------------------------------------
-  logic cap_valid, cap_sof, cap_sol;
-  logic [15:0] cap_data;
-
-  dvp_capture u_capture (
-      .pclk_i (pclk_i),
-      .rst_i  (rst_pclk_i),
-      .vsync_i(cam_vsync_i),
-      .href_i (cam_href_i),
-      .data_i (cam_data_i),
-      .valid_o(cap_valid),
-      .sof_o  (cap_sof),
-      .sol_o  (cap_sol),
-      .data_o (cap_data)
-  );
-
-  logic dec_valid, dec_sof;
-  logic [15:0] dec_data;
-
-  frame_decimator #(
-      .DataW    (16),
-      .Factor   (Factor),
-      .OutWidth (Width),
-      .OutHeight(Height)
-  ) u_decimator (
-      .clk_i  (pclk_i),
-      .rst_i  (rst_pclk_i),
-      .valid_i(cap_valid),
-      .sof_i  (cap_sof),
-      .sol_i  (cap_sol),
-      .data_i (cap_data),
-      .valid_o(dec_valid),
-      .sof_o  (dec_sof),
-      .data_o (dec_data)
-  );
-
-  logic gray_valid, gray_sof;
-  logic [7:0] gray_data;
-
-  rgb565_to_gray u_gray (
-      .clk_i  (pclk_i),
-      .rst_i  (rst_pclk_i),
-      .valid_i(dec_valid),
-      .sof_i  (dec_sof),
-      .data_i (dec_data),
-      .valid_o(gray_valid),
-      .sof_o  (gray_sof),
-      .data_o (gray_data)
-  );
-
   logic pipe_valid, pipe_sof;
   logic [7:0] pipe_data;
 
-  conv_pipeline #(
+  camera_pipeline #(
       .Width     (Width),
       .Height    (Height),
+      .Factor    (Factor),
       .K         (K),
       .NumStages (NumStages),
       .NumKernels(NumKernels),
       .KernelFile(KernelFile),
       .SelW      (SelW)
-  ) u_pipeline (
-      .clk_i       (pclk_i),
+  ) u_camera (
+      .pclk_i      (pclk_i),
       .rst_i       (rst_pclk_i),
+      .cam_vsync_i (cam_vsync_i),
+      .cam_href_i  (cam_href_i),
+      .cam_data_i  (cam_data_i),
       .stage_en_i  (stage_en_i),
       .kernel_sel_i(kernel_sel_i),
       .ready_o     (ready_o),
-      .valid_i     (gray_valid),
-      .sof_i       (gray_sof),
-      .data_i      (gray_data),
-      .valid_o     (pipe_valid),
-      .sof_o       (pipe_sof),
-      .data_o      (pipe_data)
+      .gray_valid_o(),
+      .gray_sof_o  (),
+      .gray_data_o (),
+      .out_valid_o (pipe_valid),
+      .out_sof_o   (pipe_sof),
+      .out_data_o  (pipe_data)
   );
 
   assign frame_o = pipe_valid && pipe_sof;
@@ -168,7 +125,10 @@ module camera_display #(
       .VSyncPol (VSyncPol),
       .SrcWidth (Width),
       .SrcHeight(Height),
-      .Scale    (Scale)
+      .Scale    (Scale),
+      .RBits    (RBits),
+      .GBits    (GBits),
+      .BBits    (BBits)
   ) u_lcd (
       .clk_i    (lcd_clk_i),
       .rst_i    (rst_lcd_i),

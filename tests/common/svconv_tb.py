@@ -122,3 +122,28 @@ async def uart_recv(dut, line, count: int, clks_per_bit: int, timeout_bits: int 
         assert line.value == 1, "UART: no stop bit"
         out.append(byte)
     return bytes(out)
+
+
+async def dvp_camera(
+    dut,
+    frames: list[np.ndarray],
+    h_blank: int = 20,
+    v_blank: int = 50,
+    vsync_len: int = 10,
+) -> None:
+    """Модель камеры DVP (сигналы dut.pclk_i, cam_vsync_i, cam_href_i, cam_data_i): для каждого
+    кадра RGB565 — импульс VSYNC, затем строки с HREF, пиксель — два байта, старший первым.
+    Данные меняются после фронта PCLK и выбираются ПЛИС на следующем фронте."""
+    for frame in frames:
+        dut.cam_vsync_i.value = 1
+        await ClockCycles(dut.pclk_i, vsync_len)
+        dut.cam_vsync_i.value = 0
+        await ClockCycles(dut.pclk_i, v_blank)
+        for row in frame:
+            dut.cam_href_i.value = 1
+            for pixel in row:
+                for byte in (int(pixel) >> 8, int(pixel) & 0xFF):
+                    dut.cam_data_i.value = byte
+                    await RisingEdge(dut.pclk_i)
+            dut.cam_href_i.value = 0
+            await ClockCycles(dut.pclk_i, h_blank)

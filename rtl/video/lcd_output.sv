@@ -17,6 +17,9 @@ module lcd_output #(
     parameter int unsigned SrcWidth = 160,
     parameter int unsigned SrcHeight = 120,
     parameter int unsigned Scale = 2,
+    parameter int unsigned RBits = 5,  // формат цвета: RGB565 — 5/6/5, RGB666 — 6/6/6
+    parameter int unsigned GBits = 6,
+    parameter int unsigned BBits = 5,
     localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight)
 ) (
     input logic clk_i,  // пиксельная частота
@@ -25,12 +28,12 @@ module lcd_output #(
     output logic [AddrW-1:0] fb_addr_o,
     input  logic [      7:0] fb_data_i,
 
-    output logic       hsync_o,
-    output logic       vsync_o,
-    output logic       de_o,
-    output logic [4:0] r_o,
-    output logic [5:0] g_o,
-    output logic [4:0] b_o
+    output logic             hsync_o,
+    output logic             vsync_o,
+    output logic             de_o,
+    output logic [RBits-1:0] r_o,
+    output logic [GBits-1:0] g_o,
+    output logic [BBits-1:0] b_o
 );
 
   localparam int unsigned HW = $clog2(HActive + HFront + HSync + HBack);
@@ -68,7 +71,10 @@ module lcd_output #(
       .VW       (VW),
       .SrcWidth (SrcWidth),
       .SrcHeight(SrcHeight),
-      .Scale    (Scale)
+      .Scale    (Scale),
+      .RBits    (RBits),
+      .GBits    (GBits),
+      .BBits    (BBits)
   ) u_reader (
       .clk_i    (clk_i),
       .hsync_i  (hsync),

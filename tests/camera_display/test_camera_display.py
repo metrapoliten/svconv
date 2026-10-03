@@ -19,32 +19,14 @@ from svconv_model import (
     rgb565_to_rgb888,
     rgb888_to_gray,
 )
+from svconv_tb import dvp_camera
 
 K = int(os.environ["K"])
 CAM_W, CAM_H, FACTOR = 64, 48, 4
 W, H = 16, 12
 SCREEN_W, SCREEN_H, SCALE = 40, 30, 2
+BITS = (6, 6, 6)  # RGB666, как в Makefile
 SEL_W = max(1, (len(KERNEL_ROM_ORDER) - 1).bit_length())
-# Гашение камеры в тактах PCLK.
-H_BLANK, V_BLANK, VSYNC_LEN = 20, 50, 10
-
-
-async def camera(dut, frame: np.ndarray, num_frames: int) -> None:
-    """Модель камеры DVP: VSYNC, затем строки с HREF, пиксель RGB565 — два байта, старший первым.
-    Данные меняются после фронта PCLK и выбираются ПЛИС на следующем фронте."""
-    for _ in range(num_frames):
-        dut.cam_vsync_i.value = 1
-        await ClockCycles(dut.pclk_i, VSYNC_LEN)
-        dut.cam_vsync_i.value = 0
-        await ClockCycles(dut.pclk_i, V_BLANK)
-        for row in frame:
-            dut.cam_href_i.value = 1
-            for pixel in row:
-                for byte in (int(pixel) >> 8, int(pixel) & 0xFF):
-                    dut.cam_data_i.value = byte
-                    await RisingEdge(dut.pclk_i)
-            dut.cam_href_i.value = 0
-            await ClockCycles(dut.pclk_i, H_BLANK)
 
 
 async def capture_screen(dut) -> np.ndarray:
@@ -54,8 +36,8 @@ async def capture_screen(dut) -> np.ndarray:
         await RisingEdge(dut.lcd_clk_i)
         if dut.lcd_de_o.value == 1:
             r, g, b = int(dut.lcd_r_o.value), int(dut.lcd_g_o.value), int(dut.lcd_b_o.value)
-            pixels.append((r << 11) | (g << 5) | b)
-    return np.array(pixels, dtype=np.uint16).reshape(SCREEN_H, SCREEN_W)
+            pixels.append((r << (BITS[1] + BITS[2])) | (g << BITS[2]) | b)
+    return np.array(pixels, dtype=np.uint32).reshape(SCREEN_H, SCREEN_W)
 
 
 async def run(dut, kernels: list[str], enabled: list[bool], seed: int) -> None:
@@ -88,12 +70,12 @@ async def run(dut, kernels: list[str], enabled: list[bool], seed: int) -> None:
     # Один и тот же кадр несколько раз: буфер кадра одинарный, так на экране не будет
     # «разрыва» между разными кадрами.
     rgb565 = np.random.default_rng(seed).integers(0, 1 << 16, (CAM_H, CAM_W), dtype=np.uint16)
-    await camera(dut, rgb565, num_frames=4)
+    await dvp_camera(dut, [rgb565] * 4)
     screen = await capture_screen(dut)
 
     gray = rgb888_to_gray(rgb565_to_rgb888(decimate(rgb565, FACTOR, W, H)))
     chain = [pad_kernel(KERNELS[n], K) for n, e in zip(kernels, enabled) if e]
-    expected = display_frame(pipeline(gray, chain), SCREEN_W, SCREEN_H, SCALE)
+    expected = display_frame(pipeline(gray, chain), SCREEN_W, SCREEN_H, SCALE, BITS)
     bad = np.argwhere(screen != expected)
     assert not len(bad), (
         f"{len(bad)} mismatching screen pixels, first at {tuple(int(v) for v in bad[0])}: "
