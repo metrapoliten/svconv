@@ -4,3 +4,5 @@ pillow>=10.0
 pytest>=8.0
 cocotb>=2.0
 pyserial>=3.5
+yowasp-yosys>=0.50
+z3-solver>=4.12

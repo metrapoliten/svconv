@@ -1,0 +1,16 @@
+# Доказательство свойств uart_tx: make formal (из корня репозитория)
+[options]
+mode prove
+depth 48
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal uart_tx.sv
+read_verilog -sv -formal uart_tx_fv.sv
+prep -top uart_tx_fv
+
+[files]
+../../rtl/util/uart_tx.sv
+uart_tx_fv.sv

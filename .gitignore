@@ -14,6 +14,9 @@ sim.log
 # Сгенерированные файлы инициализации памяти (model/gen_hex.py)
 *.hex
 
+# Формальная проверка: каталоги результатов SymbiYosys (formal/<модуль>/<имя .sby>/)
+/formal/*/*/
+
 # Python
 __pycache__/
 *.py[cod]
