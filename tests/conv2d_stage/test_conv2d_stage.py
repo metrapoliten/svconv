@@ -106,3 +106,34 @@ async def random_kernel_clamp(dut):
 async def random_kernel_abs(dut):
     await run_frames(dut, random_kernel("abs", seed=7), num_frames=3, gap_prob=0.2, seed=7)
 
+
+@cocotb.test()
+async def no_sof_before_first_input_frame(dut):
+    """До первого sof_i на вход идут пиксели неизвестной позиции (так выглядит выход
+    предыдущего каскада до его первого кадра): sof_o выдаваться не должен."""
+    kernel = pad_kernel(KERNELS["identity"], K)
+    start_clock(dut)
+    dut.weights_i.value = pack_weights(kernel.weights)
+    dut.shift_i.value = kernel.shift
+    dut.abs_i.value = 0
+    await reset(dut)
+    out: list[tuple[int, int]] = []
+    cocotb.start_soon(collect(dut, out))
+    rng = random.Random(8)
+    np_rng = np.random.default_rng(8)
+    # Полтора кадра «мусора» без sof: drive ставит sof у первого пикселя кадра, поэтому
+    # подаём их вручную.
+    for _ in range(WIDTH * HEIGHT * 3 // 2):
+        dut.valid_i.value = 1
+        dut.sof_i.value = 0
+        dut.data_i.value = rng.randrange(256)
+        await ClockCycles(dut.clk_i, 1)
+    garbage = len(out)
+    frames = [np_rng.integers(0, 256, (HEIGHT, WIDTH), dtype=np.uint8) for _ in range(2)]
+    await drive(dut, frames, 0.0, rng)
+    await ClockCycles(dut.clk_i, 20)
+    first_sof = next(i for i, (sof, _) in enumerate(out) if sof)
+    assert first_sof >= garbage, "sof_o выдан до первого кадра на входе"
+    got = split_frames(out, WIDTH, HEIGHT)
+    assert len(got) == 1
+    assert_frames_equal(got[0], convolve(frames[0], kernel), "кадр 0")

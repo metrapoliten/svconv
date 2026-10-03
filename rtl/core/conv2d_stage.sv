@@ -88,6 +88,16 @@ module conv2d_stage #(
     end
   end
 
+  // Захват кадра: пока на входе не было sof_i, позиция пикселей неизвестна (например, это
+  // неопределённый поток предыдущего каскада до его первого кадра), и sof_o не выдаётся —
+  // иначе потребитель принял бы этот поток за кадр.
+  logic locked_q;
+
+  always_ff @(posedge clk_i) begin
+    if (rst_i) locked_q <= 1'b0;
+    else if (valid_i && sof_i) locked_q <= 1'b1;
+  end
+
   // Центр окна, которое будет готово после этого пикселя: (y - 1 - p, x - p).
   // Если x < p, центр лежит в конце предыдущей строки. Если строка центра отрицательна,
   // это одна из нижних p + 1 строк предыдущего кадра: её окно ещё лежит в буферах, поэтому
@@ -225,7 +235,7 @@ module conv2d_stage #(
       sof_sr_q   <= '0;
     end else begin
       valid_sr_q <= {valid_sr_q[Latency-2:0], valid_i};
-      sof_sr_q   <= {sof_sr_q[Latency-2:0], valid_i && out_sof};
+      sof_sr_q   <= {sof_sr_q[Latency-2:0], valid_i && out_sof && (locked_q || sof_i)};
     end
     border_sr_q <= {border_sr_q[Latency-2:0], border};
   end
