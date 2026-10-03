@@ -40,13 +40,13 @@ class Kernel:
         w = np.asarray(self.weights)
         k = w.shape[0]
         if w.ndim != 2 or w.shape != (k, k) or k % 2 == 0:
-            raise ValueError(f"{self.name}: ядро должно быть квадратным нечётного размера")
+            raise ValueError(f"{self.name}: kernel must be square with an odd size")
         if w.min() < WEIGHT_MIN or w.max() > WEIGHT_MAX:
-            raise ValueError(f"{self.name}: веса не помещаются в знаковые 8 бит")
+            raise ValueError(f"{self.name}: weights do not fit into signed 8 bits")
         if self.shift < 0:
-            raise ValueError(f"{self.name}: сдвиг должен быть неотрицательным")
+            raise ValueError(f"{self.name}: shift must be non-negative")
         if self.mode not in ("clamp", "abs"):
-            raise ValueError(f"{self.name}: неизвестный режим {self.mode}")
+            raise ValueError(f"{self.name}: unknown mode {self.mode}")
 
     @property
     def size(self) -> int:
@@ -96,7 +96,7 @@ def pad_kernel(kernel: Kernel, k: int) -> Kernel:
     """Дополняет ядро нулями до k×k: аппаратный каскад всегда работает с окном k×k,
     поэтому и обнуляемая рамка у него шириной k // 2, а не kernel.size // 2."""
     if kernel.size > k:
-        raise ValueError(f"{kernel.name}: ядро {kernel.size}×{kernel.size} больше окна {k}×{k}")
+        raise ValueError(f"{kernel.name}: kernel {kernel.size}x{kernel.size} is larger than window {k}x{k}")
     pad = (k - kernel.size) // 2
     return Kernel(kernel.name, np.pad(kernel.weights, pad), kernel.shift, kernel.mode)
 
@@ -111,7 +111,7 @@ def kernel_rom_bytes(k: int) -> list[int]:
     for name in KERNEL_ROM_ORDER:
         kernel = pad_kernel(KERNELS[name], k)
         if kernel.shift > 15:
-            raise ValueError(f"{name}: сдвиг не помещается в 4 бита")
+            raise ValueError(f"{name}: shift does not fit into 4 bits")
         rom += [int(w) & 0xFF for w in kernel.weights.flatten()]
         rom.append((0x80 if kernel.mode == "abs" else 0) | kernel.shift)
     return rom

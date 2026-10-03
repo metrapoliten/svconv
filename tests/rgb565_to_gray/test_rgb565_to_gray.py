@@ -36,8 +36,8 @@ async def matches_model_with_one_cycle_latency(dut):
         # Читаются значения до обновления этим фронтом — они получены из входа прошлого такта.
         if prev is not None:
             p_valid, p_sof, p_pix = prev
-            assert dut.valid_o.value == int(p_valid), f"такт {idx}: valid"
-            assert dut.sof_o.value == int(p_valid and p_sof), f"такт {idx}: sof"
+            assert dut.valid_o.value == int(p_valid), f"cycle {idx}: valid"
+            assert dut.sof_o.value == int(p_valid and p_sof), f"cycle {idx}: sof"
             if p_valid:
-                assert int(dut.data_o.value) == model_gray(p_pix), f"такт {idx}: {p_pix:04x}"
+                assert int(dut.data_o.value) == model_gray(p_pix), f"cycle {idx}: pixel {p_pix:04x}"
         prev = (valid, sof, pix)

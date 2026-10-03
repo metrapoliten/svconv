@@ -15,14 +15,14 @@ from svconv_model import KERNELS, convolve, rgb888_to_gray
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Apply a kernel chain of the model to an image.")
     parser.add_argument("image", type=Path)
     parser.add_argument("out_dir", type=Path)
-    parser.add_argument("--size", default="160x120", help="ширина x высота обработки")
+    parser.add_argument("--size", default="160x120", help="processing width x height")
     parser.add_argument(
         "--chain",
         default="gauss5,gauss5,log5",
-        help=f"ядра через запятую, доступны: {', '.join(KERNELS)}",
+        help=f"comma-separated kernels, available: {', '.join(KERNELS)}",
     )
     args = parser.parse_args()
 

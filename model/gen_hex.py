@@ -20,16 +20,16 @@ def write_hex(path: Path, data: list[int]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Generate $readmemh memory init files from the model.")
     sub = parser.add_subparsers(dest="what", required=True)
 
-    kernels = sub.add_parser("kernels", help="ПЗУ ядер свёртки")
-    kernels.add_argument("--k", type=int, required=True, help="размер окна каскада")
+    kernels = sub.add_parser("kernels", help="convolution kernel ROM")
+    kernels.add_argument("--k", type=int, required=True, help="stage window size")
     kernels.add_argument("-o", "--output", type=Path, required=True)
 
-    image = sub.add_parser("image", help="изображение в оттенках серого, построчно")
+    image = sub.add_parser("image", help="grayscale image, row by row")
     image.add_argument("input", type=Path)
-    image.add_argument("--size", default="160x120", help="ширина x высота")
+    image.add_argument("--size", default="160x120", help="width x height")
     image.add_argument("-o", "--output", type=Path, required=True)
 
     args = parser.parse_args()

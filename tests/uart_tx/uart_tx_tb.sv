@@ -59,7 +59,7 @@ module uart_tx_tb;
       @(negedge tx);
       repeat (ClksPerBit / 2) @(posedge clk);
       if (tx !== 1'b0) begin
-        $display("FAIL: байт %0d: нет старт-бита", i);
+        $display("FAIL: byte %0d: no start bit", i);
         errors++;
       end
       for (int b = 0; b < 8; b++) begin
@@ -68,23 +68,23 @@ module uart_tx_tb;
       end
       repeat (ClksPerBit) @(posedge clk);
       if (tx !== 1'b1) begin
-        $display("FAIL: байт %0d: нет стоп-бита", i);
+        $display("FAIL: byte %0d: no stop bit", i);
         errors++;
       end
       if (rx_byte !== Bytes[8*i+:8]) begin
-        $display("FAIL: байт %0d: принято %h, ожидалось %h", i, rx_byte,
+        $display("FAIL: byte %0d: received %h, expected %h", i, rx_byte,
                  Bytes[8*i+:8]);
         errors++;
       end
     end
-    if (errors == 0) $display("PASS: все %0d байт приняты верно", NumBytes);
+    if (errors == 0) $display("PASS: all %0d bytes received correctly", NumBytes);
     $finish;
   end
 
   // Защита от зависания.
   initial begin
     #(10 * ClksPerBit * 12 * (NumBytes + 2) * 2);
-    $display("FAIL: тайм-аут");
+    $display("FAIL: timeout");
     $finish;
   end
 

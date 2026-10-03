@@ -28,7 +28,7 @@ async def wait_ready(dut, max_cycles: int) -> int:
         await RisingEdge(dut.clk_i)
         if dut.ready_o.value == 1:
             return cycle
-    raise AssertionError(f"ready_o не появился за {max_cycles} тактов")
+    raise AssertionError(f"ready_o not asserted within {max_cycles} cycles")
 
 
 def check_outputs(dut, sel: int) -> None:
@@ -37,9 +37,9 @@ def check_outputs(dut, sel: int) -> None:
         return
     kernel = pad_kernel(KERNELS[name], K)
     got = unpack_weights(int(dut.weights_o.value), K)
-    assert (got == kernel.weights).all(), f"{name}: веса\n{got}\nожидались\n{kernel.weights}"
-    assert int(dut.shift_o.value) == kernel.shift, f"{name}: сдвиг"
-    assert int(dut.abs_o.value) == int(kernel.mode == "abs"), f"{name}: режим"
+    assert (got == kernel.weights).all(), f"{name}: weights\n{got}\nexpected\n{kernel.weights}"
+    assert int(dut.shift_o.value) == kernel.shift, f"{name}: shift"
+    assert int(dut.abs_o.value) == int(kernel.mode == "abs"), f"{name}: mode"
 
 
 @cocotb.test()

@@ -32,7 +32,7 @@ async def run_config(
         await RisingEdge(dut.clk_i)
         if dut.ready_o.value == 1:
             break
-    assert dut.ready_o.value == 1, "ядра не загрузились"
+    assert dut.ready_o.value == 1, "kernels were not loaded"
 
     rng = random.Random(seed)
     np_rng = np.random.default_rng(seed)
@@ -50,10 +50,10 @@ async def run_config(
     p = K // 2
     lag = len(chain) * ((p + 1) * WIDTH + p)
     expected_frames = num_frames - -(-lag // (WIDTH * HEIGHT))
-    assert len(got) == expected_frames, f"полных кадров: {len(got)}, ожидалось {expected_frames}"
+    assert len(got) == expected_frames, f"complete frames: {len(got)}, expected {expected_frames}"
     assert len(out) == num_frames * WIDTH * HEIGHT
     for n, frame in enumerate(got):
-        assert_frames_equal(frame, pipeline(frames[n], chain), f"кадр {n}")
+        assert_frames_equal(frame, pipeline(frames[n], chain), f"frame {n}")
 
 
 @cocotb.test()

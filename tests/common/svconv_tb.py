@@ -67,7 +67,7 @@ def split_frames(out: list[tuple[int, int]], width: int, height: int) -> list[np
         chunk = out[s : s + width * height]
         if len(chunk) == width * height:
             data = [d for _, d in chunk]
-            assert UNDEFINED not in data, "неопределённые пиксели внутри кадра"
+            assert UNDEFINED not in data, "undefined pixels inside a frame"
             frames.append(np.array(data, dtype=np.uint8).reshape(height, width))
     return frames
 
@@ -75,9 +75,9 @@ def split_frames(out: list[tuple[int, int]], width: int, height: int) -> list[np
 def assert_frames_equal(got: np.ndarray, expected: np.ndarray, label: str) -> None:
     mismatches = np.argwhere(got != expected)
     assert not len(mismatches), (
-        f"{label}: {len(mismatches)} несовпадений, первое в (строка, столбец) "
-        f"{tuple(int(v) for v in mismatches[0])}: получено {got[tuple(mismatches[0])]}, "
-        f"ожидалось {expected[tuple(mismatches[0])]}"
+        f"{label}: {len(mismatches)} mismatches, first at (row, col) "
+        f"{tuple(int(v) for v in mismatches[0])}: got {got[tuple(mismatches[0])]}, "
+        f"expected {expected[tuple(mismatches[0])]}"
     )
 
 

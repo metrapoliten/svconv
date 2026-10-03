@@ -26,7 +26,7 @@ HEIGHT = int(os.environ["HEIGHT"])
 K = int(os.environ["K"])
 
 # Ядра 5×5 не помещаются в каскад с окном меньше 5×5.
-needs_k5 = cocotb.skipif(K < 5, reason="ядро 5×5 не помещается в окно каскада")
+needs_k5 = cocotb.skipif(K < 5, reason="a 5x5 kernel does not fit into the stage window")
 
 
 def random_kernel(mode: str, seed: int) -> Kernel:
@@ -59,11 +59,11 @@ async def run_frames(
 
     got = split_frames(out, WIDTH, HEIGHT)
     # Полностью выходят все кадры, кроме последнего.
-    assert len(got) == num_frames - 1, f"вышло полных кадров: {len(got)}"
+    assert len(got) == num_frames - 1, f"complete frames: {len(got)}"
     # Каждый входной пиксель порождает ровно один выходной.
     assert len(out) == num_frames * WIDTH * HEIGHT
     for n, frame in enumerate(got):
-        assert_frames_equal(frame, convolve(frames[n], kernel), f"кадр {n}")
+        assert_frames_equal(frame, convolve(frames[n], kernel), f"frame {n}")
 
 
 @cocotb.test()
@@ -133,7 +133,7 @@ async def no_sof_before_first_input_frame(dut):
     await drive(dut, frames, 0.0, rng)
     await ClockCycles(dut.clk_i, 20)
     first_sof = next(i for i, (sof, _) in enumerate(out) if sof)
-    assert first_sof >= garbage, "sof_o выдан до первого кадра на входе"
+    assert first_sof >= garbage, "sof_o asserted before the first input frame"
     got = split_frames(out, WIDTH, HEIGHT)
     assert len(got) == 1
-    assert_frames_equal(got[0], convolve(frames[0], kernel), "кадр 0")
+    assert_frames_equal(got[0], convolve(frames[0], kernel), "frame 0")
