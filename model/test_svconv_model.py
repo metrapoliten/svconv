@@ -5,10 +5,12 @@ import pytest
 from scipy import ndimage
 
 from svconv_model import (
+    KERNEL_ROM_ORDER,
     KERNELS,
     Kernel,
     conv2d_acc,
     convolve,
+    kernel_rom_bytes,
     pad_kernel,
     pipeline,
     postprocess,
@@ -117,3 +119,16 @@ def test_pad_kernel_keeps_result_inside_larger_border() -> None:
     np.testing.assert_array_equal(convolve(img, padded)[2:-2, 2:-2], img[2:-2, 2:-2])
     assert not convolve(img, padded)[:2].any()
 
+
+def test_kernel_rom_layout() -> None:
+    k = 5
+    rom = kernel_rom_bytes(k)
+    entry = k * k + 1
+    assert len(rom) == entry * len(KERNEL_ROM_ORDER)
+    for n, name in enumerate(KERNEL_ROM_ORDER):
+        kernel = pad_kernel(KERNELS[name], k)
+        record = rom[n * entry : (n + 1) * entry]
+        weights = [b - 256 if b > 127 else b for b in record[:-1]]
+        assert weights == kernel.weights.flatten().tolist()
+        assert record[-1] & 0x0F == kernel.shift
+        assert bool(record[-1] & 0x80) == (kernel.mode == "abs")

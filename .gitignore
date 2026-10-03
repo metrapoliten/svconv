@@ -11,6 +11,8 @@ sim_build/
 *.fst
 results.xml
 sim.log
+# Сгенерированные файлы инициализации памяти (model/gen_hex.py)
+*.hex
 
 # Python
 __pycache__/

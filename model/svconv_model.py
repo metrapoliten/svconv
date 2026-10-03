@@ -88,6 +88,10 @@ KERNELS = {
 }
 
 
+# Порядок ядер в аппаратном ПЗУ: номер ядра (вход kernel_sel) — индекс в этом списке.
+KERNEL_ROM_ORDER = ["identity", "gauss5", "log5"]
+
+
 def pad_kernel(kernel: Kernel, k: int) -> Kernel:
     """Дополняет ядро нулями до k×k: аппаратный каскад всегда работает с окном k×k,
     поэтому и обнуляемая рамка у него шириной k // 2, а не kernel.size // 2."""
@@ -95,6 +99,22 @@ def pad_kernel(kernel: Kernel, k: int) -> Kernel:
         raise ValueError(f"{kernel.name}: ядро {kernel.size}×{kernel.size} больше окна {k}×{k}")
     pad = (k - kernel.size) // 2
     return Kernel(kernel.name, np.pad(kernel.weights, pad), kernel.shift, kernel.mode)
+
+
+def kernel_rom_bytes(k: int) -> list[int]:
+    """Содержимое ПЗУ ядер для каскада с окном k×k, по байту на ячейку.
+
+    Запись ядра — k*k + 1 байт: веса построчно (дополнительный код), затем байт настройки
+    {abs, 0, 0, 0, shift[3:0]}. Ядра идут в порядке KERNEL_ROM_ORDER.
+    """
+    rom = []
+    for name in KERNEL_ROM_ORDER:
+        kernel = pad_kernel(KERNELS[name], k)
+        if kernel.shift > 15:
+            raise ValueError(f"{name}: сдвиг не помещается в 4 бита")
+        rom += [int(w) & 0xFF for w in kernel.weights.flatten()]
+        rom.append((0x80 if kernel.mode == "abs" else 0) | kernel.shift)
+    return rom
 
 
 def rgb565_to_rgb888(pix: np.ndarray) -> np.ndarray:
