@@ -10,6 +10,7 @@ from svconv_model import (
     Kernel,
     conv2d_acc,
     convolve,
+    decimate,
     display_frame,
     gray_to_rgb565,
     kernel_rom_bytes,
@@ -159,3 +160,12 @@ def test_display_frame_scales_and_centers() -> None:
     assert screen[1, 3] == gray_to_rgb565(np.array([20]))[0]
     assert screen[4, 4] == gray_to_rgb565(np.array([40]))[0]
     assert screen[0].sum() == 0 and screen[:, 0].sum() == 0 and screen[:, 5:].sum() == 0
+
+
+def test_decimate_takes_top_left_of_each_block() -> None:
+    img = np.arange(8 * 12).reshape(8, 12)
+    np.testing.assert_array_equal(decimate(img, 4, 3, 2), [[0, 4, 8], [48, 52, 56]])
+    # Лишние пиксели справа и снизу отбрасываются.
+    np.testing.assert_array_equal(decimate(img, 4, 2, 1), [[0, 4]])
+    with pytest.raises(ValueError):
+        decimate(img, 4, 4, 2)

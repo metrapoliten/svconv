@@ -132,6 +132,15 @@ def sample_image(width: int, height: int) -> np.ndarray:
     return np.clip(img, 0, 255).astype(np.uint8)
 
 
+def decimate(img: np.ndarray, factor: int, out_width: int, out_height: int) -> np.ndarray:
+    """Прореживание как в frame_decimator: из каждого квадрата factor×factor — левый верхний
+    пиксель, область out_width×out_height от левого верхнего угла."""
+    small = np.asarray(img)[::factor, ::factor][:out_height, :out_width]
+    if small.shape[:2] != (out_height, out_width):
+        raise ValueError(f"image is too small for {out_width}x{out_height} after decimation")
+    return small
+
+
 def rgb565_to_rgb888(pix: np.ndarray) -> np.ndarray:
     """RGB565 (uint16, H×W) -> RGB888 (uint8, H×W×3).
 
