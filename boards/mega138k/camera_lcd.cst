@@ -1,0 +1,112 @@
+// Ограничения пинов camera_lcd_top (Tang Mega 138K Pro Dock). Все пины — 3,3 В.
+// Источники: примеры Sipeed TangMega-138KPro-example (led, key_led, dvp_rgb, rgb_screen) и описание
+// платы в litex-boards (sipeed_tang_mega_138k_pro.py); на плате пока не проверены.
+
+// Генератор 50 МГц.
+IO_LOC "clk50_i" P16;
+IO_PORT "clk50_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+
+// Кнопка S1 (активный 0), как key0 в примере Sipeed key_led.
+IO_LOC "btn_n_i" F15;
+IO_PORT "btn_n_i" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
+
+// Камера: DVP-интерфейс дока, пины — из примера Sipeed dvp_rgb (ov5640_480_272). SCCB —
+// открытый сток с подтяжкой (как в примере); i2c_sel = 3'b101 подключает коммутатор I2C дока
+// к линиям камеры. Как подключить к этому интерфейсу модуль OV7670 2×9 проводами — свериться
+// со схемой дока (здесь — только назначение выводов ПЛИС).
+IO_LOC "cam_scl_io" K25;
+IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_sda_io" K26;
+IO_PORT "cam_sda_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_vsync_i" G17;
+IO_PORT "cam_vsync_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_href_i" E16;
+IO_PORT "cam_href_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_pclk_i" D20;
+IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_xclk_o" C17;
+IO_PORT "cam_xclk_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_rst_n_o" F17;
+IO_PORT "cam_rst_n_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_pwdn_o" D16;
+IO_PORT "cam_pwdn_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[0]" D21;
+IO_PORT "cam_data_i[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[1]" A22;
+IO_PORT "cam_data_i[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[2]" B22;
+IO_PORT "cam_data_i[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[3]" E21;
+IO_PORT "cam_data_i[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[4]" E20;
+IO_PORT "cam_data_i[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[5]" D18;
+IO_PORT "cam_data_i[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[6]" C18;
+IO_PORT "cam_data_i[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[7]" B17;
+IO_PORT "cam_data_i[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "i2c_sel_o[0]" N19;
+IO_PORT "i2c_sel_o[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "i2c_sel_o[1]" P19;
+IO_PORT "i2c_sel_o[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "i2c_sel_o[2]" P26;
+IO_PORT "i2c_sel_o[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+
+// Дисплей: RGB-разъём дока, пины и порядок бит — из примера Sipeed rgb_screen/800_480_screen
+// (r[5] — старший бит). В описании платы LiteX порядок бит обратный: если изображение выйдет
+// с неверной яркостью, начать проверку отсюда. Режим DE: HSYNC/VSYNC не используются.
+IO_LOC "lcd_clk_o" H21;
+IO_PORT "lcd_clk_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "lcd_de_o" A24;
+IO_PORT "lcd_de_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "lcd_r_o[5]" H19;
+IO_PORT "lcd_r_o[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_r_o[4]" J19;
+IO_PORT "lcd_r_o[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_r_o[3]" G25;
+IO_PORT "lcd_r_o[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_r_o[2]" H18;
+IO_PORT "lcd_r_o[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_r_o[1]" J18;
+IO_PORT "lcd_r_o[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_r_o[0]" K17;
+IO_PORT "lcd_r_o[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_g_o[5]" J16;
+IO_PORT "lcd_g_o[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_g_o[4]" K15;
+IO_PORT "lcd_g_o[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_g_o[3]" F22;
+IO_PORT "lcd_g_o[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_g_o[2]" G22;
+IO_PORT "lcd_g_o[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_g_o[1]" G21;
+IO_PORT "lcd_g_o[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_g_o[0]" G20;
+IO_PORT "lcd_g_o[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_b_o[5]" F20;
+IO_PORT "lcd_b_o[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_b_o[4]" G19;
+IO_PORT "lcd_b_o[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_b_o[3]" F19;
+IO_PORT "lcd_b_o[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_b_o[2]" F18;
+IO_PORT "lcd_b_o[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_b_o[1]" M17;
+IO_PORT "lcd_b_o[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+IO_LOC "lcd_b_o[0]" M16;
+IO_PORT "lcd_b_o[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=24 BANK_VCCIO=3.3;
+
+// Светодиоды LED0..LED5 (горят при 0), как в примерах Sipeed led и key_led.
+IO_LOC "led_n_o[0]" J14;
+IO_PORT "led_n_o[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led_n_o[1]" R26;
+IO_PORT "led_n_o[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led_n_o[2]" L20;
+IO_PORT "led_n_o[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led_n_o[3]" M25;
+IO_PORT "led_n_o[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led_n_o[4]" N21;
+IO_PORT "led_n_o[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "led_n_o[5]" N23;
+IO_PORT "led_n_o[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;

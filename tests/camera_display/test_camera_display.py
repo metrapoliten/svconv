@@ -22,9 +22,9 @@ from svconv_model import (
 from svconv_tb import dvp_camera
 
 K = int(os.environ["K"])
-CAM_W, CAM_H, FACTOR = 64, 48, 4
+CAM_W, CAM_H, FACTOR = 16, 12, 1
 W, H = 16, 12
-SCREEN_W, SCREEN_H, SCALE = 40, 30, 2
+SCREEN_W, SCREEN_H, SCALE = 40, 30, 1
 BITS = (6, 6, 6)  # RGB666, как в Makefile
 SEL_W = max(1, (len(KERNEL_ROM_ORDER) - 1).bit_length())
 
