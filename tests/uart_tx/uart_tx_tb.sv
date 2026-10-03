@@ -72,8 +72,7 @@ module uart_tx_tb;
         errors++;
       end
       if (rx_byte !== Bytes[8*i+:8]) begin
-        $display("FAIL: byte %0d: received %h, expected %h", i, rx_byte,
-                 Bytes[8*i+:8]);
+        $display("FAIL: byte %0d: received %h, expected %h", i, rx_byte, Bytes[8*i+:8]);
         errors++;
       end
     end

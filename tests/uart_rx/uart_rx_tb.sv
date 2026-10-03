@@ -77,14 +77,12 @@ module uart_rx_tb;
 
   task automatic expect_received(input string what);
     if (received.size() != NumBytes) begin
-      $display("FAIL: %s: received %0d bytes, expected %0d", what,
-               received.size(), NumBytes);
+      $display("FAIL: %s: received %0d bytes, expected %0d", what, received.size(), NumBytes);
       errors++;
     end else begin
       for (int i = 0; i < NumBytes; i++) begin
         if (received[i] !== Bytes[8*i+:8]) begin
-          $display("FAIL: %s: byte %0d = %h, expected %h", what, i, received[i],
-                   Bytes[8*i+:8]);
+          $display("FAIL: %s: byte %0d = %h, expected %h", what, i, received[i], Bytes[8*i+:8]);
           errors++;
         end
       end
