@@ -11,7 +11,7 @@ export PATH := $(CURDIR)/.venv/bin:$(PATH)
 # В formal/ — только исходники первого уровня (во вложенных каталогах — копии SymbiYosys).
 SV_SOURCES := $(shell find rtl boards tests -name '*.sv' 2>/dev/null) $(wildcard formal/*/*.sv)
 TEST_DIRS  := $(dir $(wildcard tests/*/Makefile))
-SBY_FILES  := $(wildcard formal/*/*.sby)
+SBY_FILES  ?= $(wildcard formal/*/*.sby)
 # Инструменты YoWASP называются иначе, чем обычные yosys/yosys-smtbmc.
 SBY        := yowasp-sby --yosys yowasp-yosys --smtbmc yowasp-yosys-smtbmc \
               --witness yowasp-yosys-witness
@@ -29,7 +29,10 @@ lint:
 format:
 	@set -e; for f in $(SV_SOURCES); do verible-verilog-format --verify $$f; done
 
+# Доказательства идут от секунд до десятков минут (дольше всех — uart_rx); одно можно запустить
+# так: make formal SBY_FILES=formal/uart_tx/uart_tx.sby
 formal:
+	python3 model/gen_hex.py random --count 78 --seed 1 -o formal/kernel_rom/rom.hex
 	@set -e; for f in $(SBY_FILES); do echo "== $$f"; (cd $$(dirname $$f) && $(SBY) -f $$(basename $$f)); done
 
 clean:

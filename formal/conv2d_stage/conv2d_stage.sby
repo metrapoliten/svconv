@@ -1,0 +1,26 @@
+# Доказательство свойств управления conv2d_stage. Запуск: make formal
+# gaps — пиксели с любыми паузами; continuous — пиксель каждый такт (глубина больше кадра 4×4
+# плюс отставание выхода и задержка конвейера).
+[tasks]
+gaps
+continuous
+
+[options]
+mode prove
+gaps: depth 10
+continuous: depth 40
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal sdp_ram.sv conv_postprocess.sv conv2d_stage.sv
+gaps: read_verilog -sv -formal conv2d_stage_fv.sv
+continuous: read_verilog -sv -formal -D CONTINUOUS conv2d_stage_fv.sv
+prep -top conv2d_stage_fv
+
+[files]
+../../rtl/core/sdp_ram.sv
+../../rtl/core/conv_postprocess.sv
+../../rtl/core/conv2d_stage.sv
+conv2d_stage_fv.sv

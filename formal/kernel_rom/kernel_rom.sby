@@ -1,0 +1,25 @@
+# Доказательство: kernel_rom выдаёт выбранное ядро и загружает его за ограниченное время.
+# rom.hex (случайное содержимое ПЗУ) генерируется перед запуском (make formal). Глубина — больше времени загрузки,
+# в том числе из недостижимых состояний: счётчик байтов (5 бит) может пройти полный круг,
+# поэтому глубина больше 32 + K*K + 3.
+[options]
+mode prove
+depth 64
+
+[engines]
+smtbmc z3
+
+[script]
+# -defer: модуль собирается с параметрами из обёртки (InitFile = rom.hex), а не по умолчанию.
+read_verilog -sv -formal -defer kernel_rom.sv
+read_verilog -sv -formal kernel_rom_fv.sv
+prep -top kernel_rom_fv
+# ПЗУ без записи превращаем в константную логику: иначе при индукции (старт из произвольного
+# состояния) решатель считал бы содержимое памяти произвольным.
+memory_map
+opt -full
+
+[files]
+../../rtl/core/kernel_rom.sv
+kernel_rom_fv.sv
+rom.hex

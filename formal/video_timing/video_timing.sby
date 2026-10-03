@@ -1,0 +1,17 @@
+# Доказательство: тайминги video_timing соответствуют параметрам. Запуск: make formal
+# Глубина — больше двух кадров (35 тактов): период кадра проверяется на втором спаде VSYNC.
+[options]
+mode prove
+depth 80
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal video_timing.sv
+read_verilog -sv -formal video_timing_fv.sv
+prep -top video_timing_fv
+
+[files]
+../../rtl/video/video_timing.sv
+video_timing_fv.sv

@@ -1,0 +1,19 @@
+# Доказательство: sccb_writer формирует корректную транзакцию SCCB. Запуск: make formal
+# Глубина — больше длительности транзакции (~120 тактов при четверти периода в 1 такт) и
+# больше «транзакции» из недостижимого состояния: 5-битный счётчик бит может пройти полный
+# круг (32 бита по 4 такта).
+[options]
+mode prove
+depth 150
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal sccb_writer.sv
+read_verilog -sv -formal sccb_writer_fv.sv
+prep -top sccb_writer_fv
+
+[files]
+../../rtl/camera/sccb_writer.sv
+sccb_writer_fv.sv

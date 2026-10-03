@@ -1,0 +1,16 @@
+# Доказательство: постобработка свёртки — округление до ближайшего с насыщением. make formal
+[options]
+mode prove
+depth 1
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal conv_postprocess.sv
+read_verilog -sv -formal conv_postprocess_fv.sv
+prep -top conv_postprocess_fv
+
+[files]
+../../rtl/core/conv_postprocess.sv
+conv_postprocess_fv.sv
