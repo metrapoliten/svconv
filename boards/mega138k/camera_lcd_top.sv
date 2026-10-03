@@ -15,6 +15,11 @@
 // контроллера панели ILI6122 (см. ниже). Цвет — RGB666 (6 старших бит каждого
 // канала выведены на разъём дока), R = G = B = оттенок серого.
 //
+// Камера OV7670 — модуль 2×9 на проводах «мама–папа» к гнёздам PMOD дока: управление —
+// PMOD1 (J24), данные D0..D7 — PMOD2 (J26), питание 3,3 В и земля — контакты 1 и 3 любого из
+// них (таблица — в camera_lcd.cst). Назначение сигналов по гнёздам — как в закомментированном
+// варианте примера Sipeed dvp_rgb; RESET и PWDN — на два оставшихся контакта PMOD1.
+//
 // Кнопка S1 переключает режим цепочки по кругу:
 //   0 — размытие -> размытие -> границы (по заданию), 1 — без обработки,
 //   2 — только размытие, 3 — только границы.
@@ -26,7 +31,7 @@ module camera_lcd_top (
     input logic clk50_i,
     input logic btn_n_i,  // кнопка S1, активный 0
 
-    // Камера (DVP-интерфейс дока).
+    // Камера (гнёзда PMOD1/PMOD2 дока).
     inout wire cam_scl_io,
     inout wire cam_sda_io,
     input logic cam_pclk_i,
@@ -36,7 +41,6 @@ module camera_lcd_top (
     output logic cam_xclk_o,
     output logic cam_rst_n_o,
     output logic cam_pwdn_o,
-    output logic [2:0] i2c_sel_o,    // коммутатор I2C дока: 3'b101 — линии DVP-разъёма
 
     // Дисплей (RGB-разъём дока), режим DE.
     output logic       lcd_clk_o,
@@ -176,7 +180,6 @@ module camera_lcd_top (
 
   // --- Камера: XCLK и настройка по SCCB ---------------------------------------------------
   assign cam_xclk_o = cam_clk;
-  assign i2c_sel_o  = 3'b101;
 
   logic sioc_oe, siod_oe, cam_ready;
 

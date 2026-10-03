@@ -1,6 +1,6 @@
 // Ограничения пинов camera_lcd_top (Tang Mega 138K Pro Dock). Все пины — 3,3 В.
 // Источники: примеры Sipeed TangMega-138KPro-example (led, key_led, dvp_rgb, rgb_screen), сверены со
-// схемой дока TANG_MEGA-138K-Pro_Dock-4071f rev 1.2 (листы FPGA_LCD, DVP_CAMERA, TWI_MUX,
+// схемой дока TANG_MEGA-138K-Pro_Dock-4071f rev 1.2 (листы FPGA_LCD, FPGA_EXT_CONN.,
 // PERIPHERALS); на плате пока не проверены.
 
 // Генератор 50 МГц.
@@ -11,47 +11,66 @@ IO_PORT "clk50_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 IO_LOC "btn_n_i" F15;
 IO_PORT "btn_n_i" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
 
-// Камера: разъём J17 дока (FPC 24P, распиновка OV5640), пины — из примера Sipeed dvp_rgb. SCCB
-// идёт через коммутатор I2C дока (74HC4051, подтяжки 2,2K к 3,0 В); i2c_sel = {SEL2, SEL1, SEL0}
-// = 3'b101 — канал 5, DVP_CAM. RESET и PWDN — через последовательные 10K.
-IO_LOC "cam_scl_io" K25;
+// Камера: модуль OV7670 2×9 на проводах к гнёздам PMOD1 (J24) и PMOD2 (J26) дока (схема дока,
+// лист FPGA_EXT_CONN.; банки 4 и 5 — 3,3 В). Нумерация контактов гнезда 2×6 по схеме:
+//   1 +3V3   2 +3V3
+//   3 GND    4 GND
+//   5 IO3    6 IO7
+//   7 IO2    8 IO6
+//   9 IO1   10 IO5
+//  11 IO0   12 IO4
+// Назначение — как в закомментированном варианте примера Sipeed dvp_rgb (ov5640_480_272);
+// RESET и PWDN — на свободные IO2 и IO5 гнезда PMOD1. SIOC/SIOD — открытый сток с внутренней
+// подтяжкой ПЛИС к 3,3 В (если SCCB не работает — внешние 4,7–10 кОм к 3,3 В).
+// Сигнал камеры — гнездо-контакт:
+//   SIOC   PMOD1-6
+//   SIOD   PMOD1-11
+//   VSYNC  PMOD1-12
+//   HREF   PMOD1-5
+//   PCLK   PMOD1-8
+//   XCLK   PMOD1-9
+//   RESET  PMOD1-7
+//   PWDN   PMOD1-10
+//   D0     PMOD2-6
+//   D1     PMOD2-10
+//   D2     PMOD2-5
+//   D3     PMOD2-9
+//   D4     PMOD2-8
+//   D5     PMOD2-12
+//   D6     PMOD2-7
+//   D7     PMOD2-11
+IO_LOC "cam_scl_io" H15;
 IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_sda_io" K26;
+IO_LOC "cam_sda_io" C24;
 IO_PORT "cam_sda_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_vsync_i" G17;
+IO_LOC "cam_vsync_i" B24;
 IO_PORT "cam_vsync_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_href_i" E16;
+IO_LOC "cam_href_i" H14;
 IO_PORT "cam_href_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_pclk_i" D20;
+IO_LOC "cam_pclk_i" L18;
 IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_xclk_o" C17;
+IO_LOC "cam_xclk_o" E25;
 IO_PORT "cam_xclk_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_rst_n_o" F17;
+IO_LOC "cam_rst_n_o" L17;
 IO_PORT "cam_rst_n_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_pwdn_o" D16;
+IO_LOC "cam_pwdn_o" D25;
 IO_PORT "cam_pwdn_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[0]" D21;
+IO_LOC "cam_data_i[0]" A18;
 IO_PORT "cam_data_i[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[1]" A22;
+IO_LOC "cam_data_i[1]" A20;
 IO_PORT "cam_data_i[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[2]" B22;
+IO_LOC "cam_data_i[2]" A17;
 IO_PORT "cam_data_i[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[3]" E21;
+IO_LOC "cam_data_i[3]" B20;
 IO_PORT "cam_data_i[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[4]" E20;
+IO_LOC "cam_data_i[4]" A19;
 IO_PORT "cam_data_i[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[5]" D18;
+IO_LOC "cam_data_i[5]" B21;
 IO_PORT "cam_data_i[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[6]" C18;
+IO_LOC "cam_data_i[6]" B19;
 IO_PORT "cam_data_i[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[7]" B17;
+IO_LOC "cam_data_i[7]" C21;
 IO_PORT "cam_data_i[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "i2c_sel_o[0]" N19;
-IO_PORT "i2c_sel_o[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "i2c_sel_o[1]" P19;
-IO_PORT "i2c_sel_o[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "i2c_sel_o[2]" P26;
-IO_PORT "i2c_sel_o[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
 
 // Дисплей: разъём J20 дока (FPC 40P), r/g/b[5] — R7/G7/B7 панели, r/g/b[0] — R2/G2/B2; младшие
 // два бита каждого цвета на доке заземлены (RGB666). DISP — к 3,3 В, подсветка включена по
