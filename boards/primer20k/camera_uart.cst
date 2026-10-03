@@ -31,11 +31,13 @@ IO_LOC "cam_data_i[7]" J14;
 IO_PORT "cam_data_i[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 
 // Камера, управление — гребёнка J14 (схема дока 3713, листы 1 и «Things»; бывшие линии
-// микрофонной решётки): 5 PCLK, 6 PWDN, 7 VSYNC, 8 HREF, 9 XCLK, 10 RESET, 11 SIOC, 12 SIOD.
+// микрофонной решётки): 5 RESET, 6 PWDN, 7 VSYNC, 8 HREF, 9 XCLK, 10 PCLK, 11 SIOC, 12 SIOD.
+// PCLK — на T7: это GCLKT_3 (таблица выводов GW2A-18, корпус PG256), PCLK идёт по глобальной
+// тактовой сети; остальные выводы гребёнок J12/J14 тактовыми не являются.
 // Контакт 6 (T9) на доке идёт ещё и на вход WS2812 — на нём PWDN, всегда 0.
 // SIOC/SIOD — открытый сток с внутренней подтяжкой ПЛИС к 3,3 В (на модулях 2×9 своей
 // подтяжки часто нет; если SCCB не работает — внешние 4,7–10 кОм к 3,3 В).
-IO_LOC "cam_pclk_i" P9;
+IO_LOC "cam_pclk_i" T7;
 IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 IO_LOC "cam_pwdn_o" T9;
 IO_PORT "cam_pwdn_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
@@ -45,7 +47,7 @@ IO_LOC "cam_href_i" P8;
 IO_PORT "cam_href_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 IO_LOC "cam_xclk_o" R8;
 IO_PORT "cam_xclk_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_rst_n_o" T7;
+IO_LOC "cam_rst_n_o" P9;
 IO_PORT "cam_rst_n_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
 IO_LOC "cam_scl_io" T6;
 IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
