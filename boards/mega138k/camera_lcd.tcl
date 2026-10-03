@@ -1,12 +1,11 @@
 # Сборка camera_lcd_top для Tang Mega 138K Pro. Запускается из каталога сборки (см. Makefile), где
-# лежит сгенерированный kernels.hex. Чип — переменная окружения DEVICE: по умолчанию инженерная
-# версия GW5AST-LV138FPG676AES, как в примерах Sipeed для этой платы; серийная —
-# GW5AST-LV138FPG676AC1/I0 (сверить с маркировкой чипа).
+# лежит сгенерированный kernels.hex. Чип — переменные окружения DEVICE и DEVICE_VERSION (см. Makefile).
 set board_dir [file dirname [file normalize [info script]]]
 set rtl_dir [file normalize "$board_dir/../../rtl"]
 set device $::env(DEVICE)
+set device_version $::env(DEVICE_VERSION)
 
-set_device $device -device_version B
+set_device $device -device_version $device_version
 
 foreach f {
   util/button.sv
