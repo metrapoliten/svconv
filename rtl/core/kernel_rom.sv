@@ -7,7 +7,9 @@
 // Содержимое читается из InitFile ($readmemh), который генерирует model/gen_hex.py.
 //
 // После сброса и при каждой смене sel_i модуль по одному байту за такт читает запись ядра
-// (K*K + 2 тактов) и одновременно обновляет weights_o, shift_o и abs_o. Дальше веса берутся из
+// и одновременно обновляет weights_o, shift_o и abs_o; если sel_i меняется посреди загрузки,
+// она начинается заново. При неизменном sel_i ready_o появляется не позже чем через K*K + 3
+// такта (доказано в formal/kernel_rom). Дальше веса берутся из
 // регистров — ПЗУ не читается для каждого пикселя. ready_o = 1, когда выходы соответствуют sel_i.
 module kernel_rom #(
     parameter int unsigned K = 5,
@@ -75,6 +77,12 @@ module kernel_rom #(
         issue_idx_q  <= IdxW'(1);
         rd_valid_q   <= 1'b0;
       end
+    end else if (sel_i != target_sel_q) begin
+      // Выбор сменился посреди загрузки — начинаем загрузку нового ядра сразу.
+      target_sel_q <= sel_i;
+      addr_q       <= AddrW'(sel_i) * AddrW'(Entry);
+      issue_idx_q  <= IdxW'(1);
+      rd_valid_q   <= 1'b0;
     end else begin
       if (issue_idx_q != IdxW'(Entry)) begin
         addr_q      <= addr_q + 1'b1;
