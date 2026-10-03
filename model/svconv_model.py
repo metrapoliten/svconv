@@ -88,6 +88,15 @@ KERNELS = {
 }
 
 
+def pad_kernel(kernel: Kernel, k: int) -> Kernel:
+    """Дополняет ядро нулями до k×k: аппаратный каскад всегда работает с окном k×k,
+    поэтому и обнуляемая рамка у него шириной k // 2, а не kernel.size // 2."""
+    if kernel.size > k:
+        raise ValueError(f"{kernel.name}: ядро {kernel.size}×{kernel.size} больше окна {k}×{k}")
+    pad = (k - kernel.size) // 2
+    return Kernel(kernel.name, np.pad(kernel.weights, pad), kernel.shift, kernel.mode)
+
+
 def rgb565_to_rgb888(pix: np.ndarray) -> np.ndarray:
     """RGB565 (uint16, H×W) -> RGB888 (uint8, H×W×3).
 

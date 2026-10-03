@@ -9,6 +9,7 @@ from svconv_model import (
     Kernel,
     conv2d_acc,
     convolve,
+    pad_kernel,
     pipeline,
     postprocess,
     rgb565_to_rgb888,
@@ -105,3 +106,14 @@ def test_kernel_validation() -> None:
         Kernel("big", np.array([[200]]), shift=0, mode="clamp")
     with pytest.raises(ValueError):
         Kernel("even", np.ones((2, 2), dtype=int), shift=0, mode="clamp")
+
+
+def test_pad_kernel_keeps_result_inside_larger_border() -> None:
+    """Ядро 3×3, дополненное до 5×5, считает то же, но рамка становится шириной 2."""
+    img = random_image()
+    small = KERNELS["identity"]
+    padded = pad_kernel(small, 5)
+    assert padded.size == 5
+    np.testing.assert_array_equal(convolve(img, padded)[2:-2, 2:-2], img[2:-2, 2:-2])
+    assert not convolve(img, padded)[:2].any()
+
