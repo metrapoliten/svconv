@@ -1,8 +1,11 @@
 # Проверки всего проекта.
 #
-#   make test   — тесты эталонной модели (pytest) и все тестбенчи из tests/*/ (iverilog)
+#   make test   — тесты эталонной модели (pytest) и все тесты из tests/*/ (iverilog, cocotb)
 #   make lint   — линтер verible
 #   make format — проверка форматирования verible (без изменения файлов)
+
+# Тесты на cocotb и модель используют окружение .venv (см. requirements.txt).
+export PATH := $(CURDIR)/.venv/bin:$(PATH)
 
 SV_SOURCES := $(shell find rtl boards tests -name '*.sv' 2>/dev/null)
 TEST_DIRS  := $(dir $(wildcard tests/*/Makefile))
