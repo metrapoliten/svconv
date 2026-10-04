@@ -238,14 +238,24 @@ module camera_lcd_top (
 
   // Домен PCLK: синхронизация сброса и режима (режим меняется редко; кадр, во время
   // которого он сменился, может быть смешанным).
-  logic [1:0] rst_pclk_q;
-  logic [8:0] cfg_meta_q, cfg_q;
+  logic rst_pclk;
+  logic [8:0] cfg_q;
 
-  always_ff @(posedge cam_pclk_i) begin
-    rst_pclk_q <= {rst_pclk_q[0], rst};
-    cfg_meta_q <= {stage_en, kernel_sel};
-    cfg_q      <= cfg_meta_q;
-  end
+  level_sync #(
+      .Init(1'b1)
+  ) u_rst_pclk_sync (
+      .clk_i(cam_pclk_i),
+      .d_i  (rst),
+      .q_o  (rst_pclk)
+  );
+
+  level_sync #(
+      .Width(9)
+  ) u_cfg_sync (
+      .clk_i(cam_pclk_i),
+      .d_i  ({stage_en, kernel_sel}),
+      .q_o  (cfg_q)
+  );
 
   // --- Обработка и вывод ------------------------------------------------------------------
   logic pipe_ready, frame;
@@ -282,7 +292,7 @@ module camera_lcd_top (
       .BBits     (6)
   ) u_display (
       .pclk_i      (cam_pclk_i),
-      .rst_pclk_i  (rst_pclk_q[1]),
+      .rst_pclk_i  (rst_pclk),
       .cam_vsync_i (cam_vsync_i),
       .cam_href_i  (cam_href_i),
       .cam_data_i  (cam_data_i),
@@ -304,7 +314,7 @@ module camera_lcd_top (
   logic frame_toggle_q;
 
   always_ff @(posedge cam_pclk_i) begin
-    if (rst_pclk_q[1]) frame_toggle_q <= 1'b0;
+    if (rst_pclk) frame_toggle_q <= 1'b0;
     else if (frame) frame_toggle_q <= ~frame_toggle_q;
   end
 

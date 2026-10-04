@@ -11,11 +11,12 @@ depth 170
 smtbmc z3
 
 [script]
-read_verilog -sv -formal uart_tx.sv uart_rx.sv
+read_verilog -sv -formal uart_tx.sv uart_rx.sv level_sync.sv
 read_verilog -sv -formal uart_rx_fv.sv
 prep -top uart_rx_fv
 
 [files]
 ../../rtl/util/uart_tx.sv
 ../../rtl/util/uart_rx.sv
+../../rtl/util/level_sync.sv
 uart_rx_fv.sv

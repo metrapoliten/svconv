@@ -9,7 +9,7 @@ BAUD := 100
 export K CLK_FREQ BAUD
 
 VERILOG_SOURCES := $(addprefix $(ROOT)/rtl/, \
-                     util/uart_tx.sv util/uart_rx.sv \
+                     util/uart_tx.sv util/uart_rx.sv util/level_sync.sv util/pulse_sync.sv \
                      core/sdp_ram.sv core/kernel_rom.sv core/conv_postprocess.sv core/conv2d_stage.sv \
                      core/conv_pipeline.sv core/rgb565_to_gray.sv core/frame_decimator.sv \
                      video/frame_buffer.sv camera/dvp_capture.sv camera/camera_pipeline.sv \

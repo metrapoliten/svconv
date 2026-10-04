@@ -10,7 +10,7 @@ BAUD     := 100
 export WIDTH HEIGHT K CLK_FREQ BAUD
 
 VERILOG_SOURCES := $(addprefix $(ROOT)/rtl/, \
-                     util/uart_tx.sv util/uart_rx.sv \
+                     util/uart_tx.sv util/uart_rx.sv util/level_sync.sv \
                      core/sdp_ram.sv core/conv_postprocess.sv core/conv2d_stage.sv core/kernel_rom.sv core/conv_pipeline.sv \
                      bench/frame_rom_source.sv bench/uart_bench.sv)
 COCOTB_TOPLEVEL     := uart_bench

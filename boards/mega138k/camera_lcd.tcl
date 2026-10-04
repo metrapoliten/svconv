@@ -8,7 +8,7 @@ set device_version $::env(DEVICE_VERSION)
 set_device $device -device_version $device_version
 
 foreach f {
-  util/button.sv
+  util/level_sync.sv util/button.sv
   core/sdp_ram.sv core/kernel_rom.sv core/conv_postprocess.sv core/conv2d_stage.sv
   core/conv_pipeline.sv core/rgb565_to_gray.sv core/frame_decimator.sv
   video/video_timing.sv video/frame_buffer.sv video/lcd_frame_reader.sv video/lcd_output.sv

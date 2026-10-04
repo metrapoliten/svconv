@@ -6,7 +6,7 @@ set rtl_dir [file normalize "$board_dir/../../rtl"]
 set_device GW2A-LV18PG256C8/I7 -device_version C
 
 foreach f {
-  util/uart_tx.sv util/uart_rx.sv
+  util/uart_tx.sv util/uart_rx.sv util/level_sync.sv util/pulse_sync.sv
   core/sdp_ram.sv core/kernel_rom.sv core/conv_postprocess.sv core/conv2d_stage.sv
   core/conv_pipeline.sv core/rgb565_to_gray.sv core/frame_decimator.sv
   video/frame_buffer.sv

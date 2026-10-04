@@ -14,7 +14,7 @@
 //   'p'             период кадров камеры в тактах clk_i — 4 байта, младший первым
 //
 // Домены: clk_i — UART и команды; pclk_i — камера и обработка. Кадры переходят между доменами
-// через двухтактовые кадровые буферы, флаги — через синхронизаторы переключением (toggle).
+// через двухтактовые кадровые буферы, события — через pulse_sync, настройки — через level_sync.
 module camera_uart #(
     parameter int unsigned Width = 160,
     parameter int unsigned Height = 120,
@@ -59,20 +59,10 @@ module camera_uart #(
   // =========================================================================================
   logic [NumStages-1:0] stage_en_q;
   logic [NumStages*SelW-1:0] kernel_sel_q;
-  logic arm_tgl_q;  // переключается на каждый запрос кадра
-  logic done_tgl;  // из домена PCLK: кадр захвачен
-  logic frame_tgl;  // из домена PCLK: начало кадра камеры
-
-  // Синхронизаторы флагов из домена PCLK.
-  logic [2:0] done_sync_q, frame_sync_q;
-  logic done_pulse, frame_pulse;
-
-  always_ff @(posedge clk_i) begin
-    done_sync_q  <= {done_sync_q[1:0], done_tgl};
-    frame_sync_q <= {frame_sync_q[1:0], frame_tgl};
-  end
-  assign done_pulse  = done_sync_q[2] ^ done_sync_q[1];
-  assign frame_pulse = frame_sync_q[2] ^ frame_sync_q[1];
+  logic arm_q;  // импульс: запрос кадра
+  // События из домена PCLK (импульсы в домене PCLK — ниже), пересчитанные в домен clk_i.
+  logic done_pulse;  // кадр захвачен
+  logic frame_pulse;  // начало кадра камеры
 
   // Период кадров камеры в тактах clk_i.
   logic [31:0] period_cnt_q, period_q;
@@ -143,7 +133,7 @@ module camera_uart #(
       state_q          <= Idle;
       stage_en_q       <= DefaultEn;
       kernel_sel_q     <= DefaultSel;
-      arm_tgl_q        <= 1'b0;
+      arm_q            <= 1'b0;
       rd_addr_q        <= '0;
       send_out_q       <= 1'b0;
       tx_valid_q       <= 1'b0;
@@ -151,6 +141,7 @@ module camera_uart #(
       period_idx_q     <= '0;
       period_latched_q <= '0;
     end else begin
+      arm_q <= 1'b0;
       if (tx_valid_q && tx_ready) tx_valid_q <= 1'b0;
 
       unique case (state_q)
@@ -159,8 +150,8 @@ module camera_uart #(
             unique case (rx_data)
               "c":     state_q <= CfgEn;
               "f": begin
-                arm_tgl_q <= ~arm_tgl_q;
-                state_q   <= WaitFrame;
+                arm_q   <= 1'b1;
+                state_q <= WaitFrame;
               end
               "p": begin
                 period_latched_q <= period_q;
@@ -235,18 +226,25 @@ module camera_uart #(
   // =========================================================================================
   // Домен PCLK: обработка и захват кадра.
   // =========================================================================================
-  // Конфигурация меняется редко, поэтому переходит в домен PCLK через два триггера (кадр, во
-  // время которого она сменилась, может быть смешанным); запрос кадра — переключением.
-  logic [CfgW-1:0] cfg_meta_q, cfg_q;
-  logic [2:0] arm_sync_q;
+  // Конфигурация меняется редко, поэтому переходит в домен PCLK синхронизатором уровня (кадр, во
+  // время которого она сменилась, может быть смешанным); запрос кадра — импульсом.
+  logic [CfgW-1:0] cfg_q;
   logic arm_pulse;
 
-  always_ff @(posedge pclk_i) begin
-    cfg_meta_q <= {stage_en_q, kernel_sel_q};
-    cfg_q      <= cfg_meta_q;
-    arm_sync_q <= {arm_sync_q[1:0], arm_tgl_q};
-  end
-  assign arm_pulse = arm_sync_q[2] ^ arm_sync_q[1];
+  level_sync #(
+      .Width(CfgW)
+  ) u_cfg_sync (
+      .clk_i(pclk_i),
+      .d_i  ({stage_en_q, kernel_sel_q}),
+      .q_o  (cfg_q)
+  );
+
+  pulse_sync u_arm_sync (
+      .src_clk_i  (clk_i),
+      .src_pulse_i(arm_q),
+      .dst_clk_i  (pclk_i),
+      .dst_pulse_o(arm_pulse)
+  );
 
   logic gray_valid, gray_sof, out_valid, out_sof;
   logic [7:0] gray_data, out_data;
@@ -283,7 +281,7 @@ module camera_uart #(
   logic armed_q, raw_on_q, out_wait_q, out_on_q;
   logic [AddrW-1:0] raw_cnt_q, out_cnt_q;
   logic raw_start, out_start, raw_we, out_we;
-  logic done_tgl_q, frame_tgl_q;
+  logic done_q, frame_tgl_q;
 
   assign raw_start = armed_q && ready_o && gray_valid && gray_sof;
   assign out_start = out_wait_q && out_valid && out_sof;
@@ -298,9 +296,10 @@ module camera_uart #(
       out_on_q    <= 1'b0;
       raw_cnt_q   <= '0;
       out_cnt_q   <= '0;
-      done_tgl_q  <= 1'b0;
+      done_q      <= 1'b0;
       frame_tgl_q <= 1'b0;
     end else begin
+      done_q <= 1'b0;
       if (gray_valid && gray_sof) frame_tgl_q <= ~frame_tgl_q;
       if (arm_pulse) armed_q <= 1'b1;
 
@@ -320,17 +319,29 @@ module camera_uart #(
         out_cnt_q  <= AddrW'(1);
       end else if (out_on_q && out_valid) begin
         if (out_cnt_q == AddrW'(Pixels - 1)) begin
-          out_on_q   <= 1'b0;
-          done_tgl_q <= ~done_tgl_q;  // результат пишется последним
+          out_on_q <= 1'b0;
+          done_q   <= 1'b1;  // результат пишется последним
         end
         out_cnt_q <= out_cnt_q + 1'b1;
       end
     end
   end
 
-  assign done_tgl  = done_tgl_q;
-  assign frame_tgl = frame_tgl_q;
-  assign frame_o   = frame_tgl_q;
+  assign frame_o = frame_tgl_q;
+
+  pulse_sync u_done_sync (
+      .src_clk_i  (pclk_i),
+      .src_pulse_i(done_q),
+      .dst_clk_i  (clk_i),
+      .dst_pulse_o(done_pulse)
+  );
+
+  pulse_sync u_frame_sync (
+      .src_clk_i  (pclk_i),
+      .src_pulse_i(gray_valid && gray_sof),
+      .dst_clk_i  (clk_i),
+      .dst_pulse_o(frame_pulse)
+  );
 
   frame_buffer #(
       .Width (Width),

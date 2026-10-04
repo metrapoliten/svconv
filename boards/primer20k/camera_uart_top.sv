@@ -72,9 +72,16 @@ module camera_uart_top #(
   assign cam_sda_io = siod_oe ? 1'b0 : 1'bz;
 
   // --- Сброс домена PCLK ------------------------------------------------------------------
-  logic [1:0] rst_pclk_q;
+  // Сброс в домен PCLK переходит через синхронизатор; после загрузки ПЛИС домен уже в сбросе.
+  logic rst_pclk;
 
-  always_ff @(posedge cam_pclk_i) rst_pclk_q <= {rst_pclk_q[0], rst};
+  level_sync #(
+      .Init(1'b1)
+  ) u_rst_pclk_sync (
+      .clk_i(cam_pclk_i),
+      .d_i  (rst),
+      .q_o  (rst_pclk)
+  );
 
   // --- Стенд --------------------------------------------------------------------------------
   // Номера ядер — порядок KERNEL_ROM_ORDER в модели: 0 identity, 1 gauss5, 2 log5.
@@ -103,7 +110,7 @@ module camera_uart_top #(
       .uart_tx_o  (uart_tx_o),
       .busy_o     (busy),
       .pclk_i     (cam_pclk_i),
-      .rst_pclk_i (rst_pclk_q[1]),
+      .rst_pclk_i (rst_pclk),
       .cam_vsync_i(cam_vsync_i),
       .cam_href_i (cam_href_i),
       .cam_data_i (cam_data_i),

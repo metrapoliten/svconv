@@ -25,11 +25,15 @@ module uart_rx #(
   localparam logic [CntWidth-1:0] CntHalf = CntWidth'((ClksPerBit - 1) / 2);
 
   // Синхронизатор: начальное значение 1 — линия в покое.
-  logic [1:0] sync_q = 2'b11;
-  logic       rx;
+  logic rx;
 
-  always_ff @(posedge clk_i) sync_q <= {sync_q[0], rx_i};
-  assign rx = sync_q[1];
+  level_sync #(
+      .Init(1'b1)
+  ) u_sync (
+      .clk_i(clk_i),
+      .d_i  (rx_i),
+      .q_o  (rx)
+  );
 
   typedef enum logic [1:0] {
     Idle,

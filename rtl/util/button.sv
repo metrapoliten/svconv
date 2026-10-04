@@ -15,12 +15,14 @@ module button #(
 
   localparam int unsigned CntW = $clog2(StableClks + 1);
 
-  logic [1:0] sync_q;
   logic raw;
   logic [CntW-1:0] cnt_q;
 
-  always_ff @(posedge clk_i) sync_q <= {sync_q[0], btn_i ^ ActiveLow};
-  assign raw = sync_q[1];
+  level_sync u_sync (
+      .clk_i(clk_i),
+      .d_i  (btn_i ^ ActiveLow),
+      .q_o  (raw)
+  );
 
   always_ff @(posedge clk_i) begin
     if (rst_i) begin
