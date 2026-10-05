@@ -24,5 +24,8 @@ add_file "$board_dir/camera_lcd.sdc"
 set_option -top_module camera_lcd_top
 set_option -verilog_std sysv2017
 set_option -output_base_name camera_lcd
+# Регистры, которые прямо выводятся на ножки (RGB и DE дисплея), — в блоки ввода-вывода: у GW5A-138
+# по умолчанию выключено. Зачем — см. «Выводы дисплея» в camera_lcd_top.sv.
+set_option -oreg_in_iob 1
 
 run all

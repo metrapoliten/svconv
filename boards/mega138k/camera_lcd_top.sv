@@ -15,10 +15,10 @@
 // контроллера панели ILI6122 (см. ниже). Цвет — RGB666 (6 старших бит каждого
 // канала выведены на разъём дока), R = G = B = оттенок серого.
 //
-// Камера OV7670 — модуль 2×9 на проводах «мама–папа» к гнёздам PMOD дока: управление —
-// PMOD1 (J24), данные D0..D7 — PMOD2 (J26), питание 3,3 В и земля — контакты 1 и 3 любого из
-// них (таблица — в camera_lcd.cst). Назначение сигналов по гнёздам — как в закомментированном
-// варианте примера Sipeed dvp_rgb; RESET и PWDN — на два оставшихся контакта PMOD1.
+// Камера OV7670 — модуль 2×9 на проводах «мама–папа» к гнёздам PMOD1 (J24) и PMOD2 (J26) дока,
+// по порядку выводов модуля (таблица — в camera_lcd.cst):
+//   PMOD1: 1 3V3, 3 GND, 5 SIOC, 6 SIOD, 7 VSYNC, 8 HREF, 9 PCLK, 10 XCLK, 11 D7, 12 D6
+//   PMOD2: 5 D5, 6 D4, 7 D3, 8 D2, 9 D1, 10 D0, 11 RESET, 12 PWDN
 //
 // Кнопка S1 переключает режим цепочки по кругу:
 //   0 — размытие -> размытие -> границы (по заданию), 1 — без обработки,
@@ -27,7 +27,20 @@
 // Светодиоды дока (горят при 0): LED0 — мигает раз в секунду, LED1 — камера настроена,
 // LED2 — переключается на каждом обработанном кадре, LED3 — ядра загружены,
 // LED4, LED5 — номер режима.
-module camera_lcd_top (
+// Параметры — для тестов (tests/camera_lcd_top_modes): по умолчанию — то, что загружается в плату.
+module camera_lcd_top #(
+    // Размер кадра камеры (OV7670 настроена на 640×480). Тест переключения режимов берёт
+    // маленький кадр: обработка, переходы между доменами и управление те же, а моделировать
+    // каждый кадр в десятки раз быстрее.
+    parameter int unsigned CamWidth = 640,
+    parameter int unsigned CamHeight = 480,
+    // Частота SCCB, Гц (почему 25 кГц — см. u_cam_init). Тест повышает: иначе настройка камеры
+    // занимает ~115 мс модельного времени.
+    parameter int unsigned SccbFreq = 25_000,
+    // Подавление дребезга кнопки: 10 мс при 50 МГц. Тест уменьшает, чтобы не моделировать
+    // миллисекунды на каждое нажатие.
+    parameter int unsigned BtnStableClks = 500_000
+) (
     input logic clk50_i,
     input logic btn_n_i,  // кнопка S1, активный 0
 
@@ -161,15 +174,6 @@ module camera_lcd_top (
       .SSCMDSEL_FRAC(3'b0)
   );
 
-  // Фронт, по которому контроллер панели ILI6122 защёлкивает данные, задаёт его вывод CLKPOL
-  // (в спецификации SH500Q01Z не указан). Примеры Sipeed для этого 5" экрана (Tang Nano 9K
-  // lcd_led, Mega 138K rgb_screen/800_480_screen) выводят тактовый сигнал без инверсии, а
-  // данные меняют по нарастающему фронту — значит, панель защёлкивает их по спадающему, в
-  // середине такта (запас до 14 нс при требуемых ILI6122 8 нс установки и 8 нс удержания).
-  // Если изображение «рябит» или сдвинуто на пиксель — поставить LcdClkInvert = 1.
-  localparam bit LcdClkInvert = 1'b0;
-  assign lcd_clk_o = LcdClkInvert ? ~lcd_clk : lcd_clk;
-
   // Сброс домена LCD — пока PLL не захватил частоту; снимается синхронно.
   logic [1:0] rst_lcd_q;
 
@@ -188,7 +192,7 @@ module camera_lcd_top (
   // Нижнего предела частоты у SCCB нет; настройка камеры длится ~115 мс вместо ~45.
   ov7670_init #(
       .ClkFreq (ClkFreq),
-      .SccbFreq(25_000)
+      .SccbFreq(SccbFreq)
   ) u_cam_init (
       .clk_i      (clk50_i),
       .rst_i      (rst),
@@ -207,7 +211,7 @@ module camera_lcd_top (
   logic [1:0] mode_q;
 
   button #(
-      .StableClks(ClkFreq / 100),
+      .StableClks(BtnStableClks),
       .ActiveLow (1'b1)
   ) u_button (
       .clk_i    (clk50_i),
@@ -222,13 +226,49 @@ module camera_lcd_top (
     else if (btn_press) mode_q <= mode_q + 1'b1;
   end
 
+  // В домен PCLK режим уходит кодом Грея (00, 01, 11, 10): при нажатии меняется ровно один
+  // разряд, поэтому синхронизатор выдаёт либо старый режим, либо новый, но не их смесь. Код —
+  // выход триггера, а настройка цепочки расшифровывается уже в домене PCLK.
+  logic [1:0] mode_gray_q;
+
+  always_ff @(posedge clk50_i) mode_gray_q <= mode_q ^ (mode_q >> 1);
+
+  // Домен PCLK: синхронизация сброса и режима. После смены режима один-два выведенных кадра
+  // могут быть смешанными (см. conv_pipeline.sv) — на экране это незаметно.
+  // Домен PCLK стоит в сбросе, пока камера не настроена: во время её сброса и записи регистров
+  // PCLK может останавливаться и сбоить, а kernel_rom загружает веса ядер только после сброса и
+  // при смене ядра. На синхронизатор идёт выход триггера, а не комбинационное выражение.
+  logic rst_cam_q = 1'b1;
+  logic rst_pclk;
+  logic [1:0] mode_gray_pclk, mode_pclk;
+
+  always_ff @(posedge clk50_i) rst_cam_q <= rst || !cam_ready;
+
+  level_sync #(
+      .Init(1'b1)
+  ) u_rst_pclk_sync (
+      .clk_i(cam_pclk_i),
+      .d_i  (rst_cam_q),
+      .q_o  (rst_pclk)
+  );
+
+  level_sync #(
+      .Width(2)
+  ) u_mode_sync (
+      .clk_i(cam_pclk_i),
+      .d_i  (mode_gray_q),
+      .q_o  (mode_gray_pclk)
+  );
+
+  assign mode_pclk = {mode_gray_pclk[1], ^mode_gray_pclk};
+
   // Номера ядер — порядок KERNEL_ROM_ORDER в модели: 0 identity, 1 gauss5, 2 log5.
   localparam int unsigned SelW = 2;
   logic [2:0] stage_en;
   logic [3*SelW-1:0] kernel_sel;
 
   always_comb begin
-    unique case (mode_q)
+    unique case (mode_pclk)
       2'd0:
       {stage_en, kernel_sel} = {
         3'b111, 2'd2, 2'd1, 2'd1
@@ -239,36 +279,17 @@ module camera_lcd_top (
     endcase
   end
 
-  // Домен PCLK: синхронизация сброса и режима. Режим меняется редко; после смены один-два
-  // выведенных кадра могут быть смешанными (см. conv_pipeline.sv) — на экране это незаметно.
-  logic rst_pclk;
-  logic [8:0] cfg_q;
-
-  level_sync #(
-      .Init(1'b1)
-  ) u_rst_pclk_sync (
-      .clk_i(cam_pclk_i),
-      .d_i  (rst),
-      .q_o  (rst_pclk)
-  );
-
-  level_sync #(
-      .Width(9)
-  ) u_cfg_sync (
-      .clk_i(cam_pclk_i),
-      .d_i  ({stage_en, kernel_sel}),
-      .q_o  (cfg_q)
-  );
-
   // --- Обработка и вывод ------------------------------------------------------------------
   logic pipe_ready, frame;
+  logic lcd_de;
+  logic [5:0] lcd_r, lcd_g, lcd_b;
   logic
       lcd_hsync,
       lcd_vsync;  // дисплей работает в режиме DE, синхроимпульсы не выводятся
 
   camera_display #(
-      .Width     (640),
-      .Height    (480),
+      .Width     (CamWidth),
+      .Height    (CamHeight),
       .Factor    (1),
       .K         (5),
       .NumStages (3),
@@ -299,19 +320,66 @@ module camera_lcd_top (
       .cam_vsync_i (cam_vsync_i),
       .cam_href_i  (cam_href_i),
       .cam_data_i  (cam_data_i),
-      .stage_en_i  (cfg_q[8:6]),
-      .kernel_sel_i(cfg_q[5:0]),
+      .stage_en_i  (stage_en),
+      .kernel_sel_i(kernel_sel),
       .ready_o     (pipe_ready),
       .frame_o     (frame),
       .lcd_clk_i   (lcd_clk),
       .rst_lcd_i   (rst_lcd_q[1]),
       .lcd_hsync_o (lcd_hsync),
       .lcd_vsync_o (lcd_vsync),
-      .lcd_de_o    (lcd_de_o),
-      .lcd_r_o     (lcd_r_o),
-      .lcd_g_o     (lcd_g_o),
-      .lcd_b_o     (lcd_b_o)
+      .lcd_de_o    (lcd_de),
+      .lcd_r_o     (lcd_r),
+      .lcd_g_o     (lcd_g),
+      .lcd_b_o     (lcd_b)
   );
+
+  // --- Выводы дисплея ---------------------------------------------------------------------
+  // Фронт, по которому контроллер панели ILI6122 защёлкивает данные, задаёт его вывод CLKPOL
+  // (в спецификации SH500Q01Z не указан). Примеры Sipeed для этого 5" экрана (Tang Nano 9K
+  // lcd_led, Mega 138K rgb_screen/800_480_screen) выводят тактовый сигнал без инверсии, а
+  // данные меняют по нарастающему фронту — значит, панель защёлкивает их по спадающему, в
+  // середине такта. По даташиту ILI6122 по умолчанию (CLKPOL = L) так и есть; ему нужно 8 нс
+  // установки и 8 нс удержания, так что из полутакта 14,3 нс на перекос данных относительно
+  // DCLK остаётся ±6,3 нс.
+  //
+  // Чтобы перекос не зависел от размещения, все 20 сигналов выходят из блоков ввода-вывода
+  // (IOB) с одного тактового дерева: RGB и DE — с выходных регистров IOB (опция -oreg_in_iob в
+  // camera_lcd.tcl), DCLK — с ODDR, который выдаёт 1 в первой половине такта и 0 во второй. Тогда
+  // перекос — разница между одинаковыми IOB, доли наносекунды. У каждой ножки свой регистр:
+  // R = G = B, и без syn_preserve синтез склеил бы их в один, который в IOB не поместить.
+  // Регистры задерживают картинку на такт — вместе с DE, для панели это незаметно.
+  // Если изображение «рябит» или сдвинуто на пиксель — поставить LcdClkInvert = 1.
+  localparam bit LcdClkInvert = 1'b0;
+
+  ODDR #(
+      .TXCLK_POL(1'b0),
+      .INIT     (1'b0)
+  ) u_lcd_clk_oddr (
+      .Q0 (lcd_clk_o),
+      .Q1 (),
+      .D0 (!LcdClkInvert),
+      .D1 (LcdClkInvert),
+      .TX (1'b0),
+      .CLK(lcd_clk)
+  );
+
+  logic       lcd_de_q  /* synthesis syn_preserve = 1 */;
+  logic [5:0] lcd_r_q  /* synthesis syn_preserve = 1 */;
+  logic [5:0] lcd_g_q  /* synthesis syn_preserve = 1 */;
+  logic [5:0] lcd_b_q  /* synthesis syn_preserve = 1 */;
+
+  always_ff @(posedge lcd_clk) begin
+    lcd_de_q <= lcd_de;
+    lcd_r_q  <= lcd_r;
+    lcd_g_q  <= lcd_g;
+    lcd_b_q  <= lcd_b;
+  end
+
+  assign lcd_de_o = lcd_de_q;
+  assign lcd_r_o  = lcd_r_q;
+  assign lcd_g_o  = lcd_g_q;
+  assign lcd_b_o  = lcd_b_q;
 
   // --- Светодиоды -------------------------------------------------------------------------
   logic frame_toggle_q;

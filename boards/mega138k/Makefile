@@ -36,6 +36,8 @@ camera_lcd:
 	$(GEN_HEX) kernels --k 5 -o $(BUILD_DIR)/camera_lcd/kernels.hex
 	# Без QT_QPA_PLATFORM=minimal gw_sh падает при инициализации Qt.
 	cd $(BUILD_DIR)/camera_lcd && DEVICE=$(DEVICE) DEVICE_VERSION=$(DEVICE_VERSION) QT_QPA_PLATFORM=minimal "$(GW_SH)" $(BOARD_DIR)/camera_lcd.tcl
+	# Запас на входе панели: Gowin сам выходы с DCLK не сравнивает (см. camera_lcd.sdc).
+	$(PYTHON) $(ROOT)/tools/check_lcd_timing.py $(BUILD_DIR)/camera_lcd/impl/pnr/camera_lcd.tr
 
 load-camera_lcd:
 	"$(LOADER)" -b $(BOARD) $(BUILD_DIR)/camera_lcd/impl/pnr/camera_lcd.fs

@@ -23,58 +23,56 @@ IO_PORT "btn_n_i" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
 // и разъёмов HDMI в левом верхнем углу: J22 (PMOD0), J24 (PMOD1), J26 (PMOD2) слева направо.
 // Контакт 1 (квадратная площадка) — справа, в ряду, дальнем от края платы; контакт 2 — рядом с
 // ним, ближе к краю; далее 3, 4 и т. д. влево.
-// Назначение — как в закомментированном варианте примера Sipeed dvp_rgb (ov5640_480_272);
-// RESET и PWDN — на свободные IO2 и IO5 гнезда PMOD1. SIOC/SIOD — открытый сток с внутренней
-// подтяжкой ПЛИС к 3,3 В (если SCCB не работает — внешние 4,7–10 кОм к 3,3 В).
-// Сигнал камеры — гнездо-контакт:
-//   SIOC   PMOD1-6
-//   SIOD   PMOD1-11
-//   VSYNC  PMOD1-12
-//   HREF   PMOD1-5
-//   PCLK   PMOD1-8
-//   XCLK   PMOD1-9
-//   RESET  PMOD1-7
-//   PWDN   PMOD1-10
-//   D0     PMOD2-6
-//   D1     PMOD2-10
-//   D2     PMOD2-5
-//   D3     PMOD2-9
-//   D4     PMOD2-8
-//   D5     PMOD2-12
-//   D6     PMOD2-7
-//   D7     PMOD2-11
-IO_LOC "cam_scl_io" H15;
+// Подключение — по порядку выводов модуля 2×9 (1 3V3, 2 GND, 3 SIOC, 4 SIOD, 5 VSYNC, 6 HREF,
+// 7 PCLK, 8 XCLK, 9..16 D7..D0, 17 RESET, 18 PWDN), как на Primer 20K, но без исключений: среди
+// контактов PMOD1/PMOD2 нет ни тактовых входов (GCLK), ни выводов конфигурации (UG986, корпус
+// FPG676A; D25 — VREF, здесь обычный вывод), PCLK идёт по обычной трассировке.
+//   PMOD1: 1 3V3, 3 GND, 5 SIOC, 6 SIOD, 7 VSYNC, 8 HREF, 9 PCLK, 10 XCLK, 11 D7, 12 D6
+//   PMOD2: 5 D5, 6 D4, 7 D3, 8 D2, 9 D1, 10 D0, 11 RESET, 12 PWDN
+// Выводы ПЛИС: PMOD1 5 H14, 6 H15, 7 L17, 8 L18, 9 E25, 10 D25, 11 C24, 12 B24;
+//              PMOD2 5 A17, 6 A18, 7 B19, 8 A19, 9 B20, 10 A20, 11 C21, 12 B21.
+// SIOC/SIOD — открытый сток с внутренней подтяжкой ПЛИС к 3,3 В (если SCCB не работает — внешние
+// 4,7–10 кОм к 3,3 В).
+// Камера на проводах одним пучком с одной землёй — меры, найденные опытом на Primer 20K (см.
+// boards/primer20k/camera_uart.cst): COM2 = 1x (таблица ov7670_init), гистерезис на PCLK, HREF
+// и VSYNC, XCLK с наименьшим током (DRIVE=4; его провод соседний с PCLK). У GW5A гистерезис —
+// только ON/OFF (HIGH не принимается), и на входах LVCMOS он включён по умолчанию; здесь — явно.
+
+// PMOD1.
+IO_LOC "cam_scl_io" H14;
 IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_sda_io" C24;
+IO_LOC "cam_sda_io" H15;
 IO_PORT "cam_sda_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_vsync_i" B24;
-IO_PORT "cam_vsync_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_href_i" H14;
-IO_PORT "cam_href_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_pclk_i" L18;
-IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_xclk_o" E25;
-IO_PORT "cam_xclk_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_rst_n_o" L17;
-IO_PORT "cam_rst_n_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_pwdn_o" D25;
-IO_PORT "cam_pwdn_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[0]" A18;
-IO_PORT "cam_data_i[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[1]" A20;
-IO_PORT "cam_data_i[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[2]" A17;
-IO_PORT "cam_data_i[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[3]" B20;
-IO_PORT "cam_data_i[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[4]" A19;
-IO_PORT "cam_data_i[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[5]" B21;
-IO_PORT "cam_data_i[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[6]" B19;
-IO_PORT "cam_data_i[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[7]" C21;
+IO_LOC "cam_vsync_i" L17;
+IO_PORT "cam_vsync_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE HYSTERESIS=ON BANK_VCCIO=3.3;
+IO_LOC "cam_href_i" L18;
+IO_PORT "cam_href_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE HYSTERESIS=ON BANK_VCCIO=3.3;
+IO_LOC "cam_pclk_i" E25;
+IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE HYSTERESIS=ON BANK_VCCIO=3.3;
+IO_LOC "cam_xclk_o" D25;
+IO_PORT "cam_xclk_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=4 BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[7]" C24;
 IO_PORT "cam_data_i[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[6]" B24;
+IO_PORT "cam_data_i[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+
+// PMOD2.
+IO_LOC "cam_data_i[5]" A17;
+IO_PORT "cam_data_i[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[4]" A18;
+IO_PORT "cam_data_i[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[3]" B19;
+IO_PORT "cam_data_i[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[2]" A19;
+IO_PORT "cam_data_i[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[1]" B20;
+IO_PORT "cam_data_i[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[0]" A20;
+IO_PORT "cam_data_i[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_rst_n_o" C21;
+IO_PORT "cam_rst_n_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_pwdn_o" B21;
+IO_PORT "cam_pwdn_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
 
 // Дисплей: разъём J20 дока (FPC 40P), r/g/b[5] — R7/G7/B7 панели, r/g/b[0] — R2/G2/B2; младшие
 // два бита каждого цвета на доке заземлены (RGB666). DISP — к 3,3 В, подсветка включена по

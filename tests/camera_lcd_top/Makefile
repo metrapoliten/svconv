@@ -1,5 +1,6 @@
 # Сквозной тест верхнего модуля для Mega 138K Pro (camera_lcd_top): PLL Gowin, камера 640×480,
-# цепочка по умолчанию (режим 0), вывод на экран 800×480 RGB666. make test
+# цепочка по умолчанию (режим 0), вывод на экран 800×480 RGB666 с проверкой интерфейса панели.
+# Переключение режимов — в tests/camera_lcd_top_modes. make test
 #
 # PLL моделируется библиотекой Gowin: $GOWIN_HOME/simlib/gw5a/prim_sim.v из установленного
 # Gowin EDA (переменная окружения GOWIN_HOME) или файл, заданный в GOWIN_SIM; в репозиторий она
@@ -25,6 +26,9 @@ VERILOG_SOURCES := $(addprefix $(ROOT)/rtl/, \
                      camera/camera_display.sv) \
                    $(ROOT)/boards/mega138k/camera_lcd_top.sv $(GOWIN_SIM)
 COCOTB_TOPLEVEL     := camera_lcd_top
+# Модель ODDR из библиотеки Gowin обращается к глобальному сбросу GSR.GSRO: модуль GSR — второй
+# корень иерархии (вход не подключён, глобальный сброс не срабатывает).
+COMPILE_ARGS += -s GSR
 COCOTB_TEST_MODULES := test_camera_lcd_top
 GEN_HEX := python3 $(ROOT)/model/gen_hex.py kernels --k 5 -o kernels.hex
 

@@ -17,3 +17,20 @@ set_input_delay -clock pclk -clock_fall -1.0 -min [get_ports {cam_data_i[*] cam_
 // Худшие пути от входов камеры — отдельно в отчёте (.tr, раздел Timing Report By Analysis Type).
 report_timing -setup -from [get_ports {cam_data_i[*] cam_href_i cam_vsync_i}] -max_paths 3
 report_timing -hold -from [get_ports {cam_data_i[*] cam_href_i cam_vsync_i}] -max_paths 3
+// Выходы на дисплей. Панель (ILI6122) защёлкивает RGB и DE по спаду DCLK, ей нужно 8 нс установки и
+// 8 нс удержания. Все 20 сигналов выходят из блоков ввода-вывода по такту PLL (см. «Выводы
+// дисплея» в camera_lcd_top.sv), но сравнить данные с DCLK на ножке Gowin не умеет: такт,
+// объявленный на выходной ножке, он считает идеальным, без задержки PLL, дерева тактов и буфера.
+// Поэтому здесь задержки выходов только отсчитываются от такта PLL (ограничение 0 нс — чтобы
+// Gowin их посчитал), а запас относительно DCLK по ним считает tools/check_lcd_timing.py после
+// сборки.
+// Такт PLL объявлен явно (35 МГц = 50 × 7 / 10): на автоматический такт PLL из sdc сослаться
+// нельзя — Gowin создаёт его уже после разбора ограничений.
+create_generated_clock -name lcd_clk -source [get_ports {clk50_i}] -master_clock clk50 -multiply_by 7 -divide_by 10 [get_pins {u_pll/CLKOUT0}]
+set_output_delay -clock lcd_clk 0 [get_ports {lcd_clk_o lcd_de_o lcd_r_o[*] lcd_g_o[*] lcd_b_o[*]}]
+// Отчёты для check_lcd_timing.py: смена данных (по фронту такта) и спад DCLK (ODDR опускает DCLK
+// по спаду такта — путь, запущенный спадом); -setup — медленный угол, -hold — быстрый.
+report_timing -setup -to [get_ports {lcd_de_o lcd_r_o[*] lcd_g_o[*] lcd_b_o[*]}] -max_paths 40
+report_timing -hold -to [get_ports {lcd_de_o lcd_r_o[*] lcd_g_o[*] lcd_b_o[*]}] -max_paths 40
+report_timing -setup -fall_from_clock [get_clocks {lcd_clk}] -to [get_ports {lcd_clk_o}] -max_paths 1
+report_timing -hold -fall_from_clock [get_clocks {lcd_clk}] -to [get_ports {lcd_clk_o}] -max_paths 1
