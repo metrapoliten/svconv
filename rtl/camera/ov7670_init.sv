@@ -18,7 +18,10 @@
 //     домена захвата: без него dvp_capture не увидел бы ни VSYNC, ни конца строки;
 //   - в конце CLKRC записан ещё раз: для RGB565 его нужно записывать после остальных
 //     настроек формата, иначе изображение хуже (драйвер Linux drivers/media/i2c/ov7670.c;
-//     так же у Mike Field, от которого идут FPGA-таблицы для OV7670).
+//     так же у Mike Field, от которого идут FPGA-таблицы для OV7670);
+//   - COM2 = 0x00: выходы камеры с наименьшей силой (1x вместо 2x по умолчанию; даташит v1.4,
+//     COM2[1:0] «increase IOL/IOH drive current»). Камера подключена проводами с одной землёй:
+//     мягкие фронты данных и PCLK меньше раскачивают землю и меньше наводят на HREF/VSYNC.
 module ov7670_init #(
     parameter int unsigned ClkFreq  = 27_000_000,  // частота clk_i, Гц
     parameter int unsigned SccbFreq = 100_000
@@ -33,7 +36,7 @@ module ov7670_init #(
     output logic done_o
 );
 
-  localparam int unsigned NumRegs = 79;
+  localparam int unsigned NumRegs = 80;
   localparam int unsigned Ms = ClkFreq / 1000;
   localparam int unsigned ResetClks = Ms;  // RESET# = 0
   localparam int unsigned WaitClks = 10 * Ms;  // пауза после сброса
@@ -123,7 +126,8 @@ module ov7670_init #(
       7'd75: ov7670_reg = 16'h13_E5;  // COM8, enable AGC / AEC
       7'd76: ov7670_reg = 16'h1E_23;  // Mirror Image
       7'd77: ov7670_reg = 16'h69_06;  // gain of RGB(manually adjusted)
-      7'd78: ov7670_reg = 16'h11_80;  // CLKRC again, after the format (see header)
+      7'd78: ov7670_reg = 16'h09_00;  // COM2: output drive 1x (see header)
+      7'd79: ov7670_reg = 16'h11_80;  // CLKRC again, after the format (see header)
       default: ov7670_reg = 16'hFF_FF;
     endcase
   endfunction
