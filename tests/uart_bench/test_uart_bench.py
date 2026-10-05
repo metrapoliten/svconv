@@ -86,3 +86,35 @@ async def ignores_unknown_commands(dut):
     await uart_send(dut, dut.uart_rx_i, b"xyz", CLKS_PER_BIT)
     frame = await request_frame(dut)
     assert_frames_equal(frame, expected(["identity"] * 3, [True] * 3), "after junk")
+
+
+# Тайм-аут незавершённой команды стенда (параметр CmdTimeoutBits) с запасом.
+CMD_TIMEOUT_CYCLES = 1000 * CLKS_PER_BIT + 10 * CLKS_PER_BIT
+
+
+@cocotb.test()
+async def truncated_command_is_discarded(dut):
+    """Оборванная команда 'c' отбрасывается по тайм-ауту: следующая команда разбирается
+    правильно, а байт en оборванной команды не применяется."""
+    await setup(dut)
+    edges = (["gauss5", "gauss5", "log5"], [False, False, True])
+    await configure(dut, *edges)
+    # Только 'c' и только 'c' + en — ни одна не должна изменить цепочку.
+    await uart_send(dut, dut.uart_rx_i, b"c", CLKS_PER_BIT)
+    await ClockCycles(dut.clk_i, CMD_TIMEOUT_CYCLES)
+    await uart_send(dut, dut.uart_rx_i, bytes([ord("c"), 0]), CLKS_PER_BIT)
+    await ClockCycles(dut.clk_i, CMD_TIMEOUT_CYCLES)
+    assert_frames_equal(await request_frame(dut), expected(*edges), "after truncated commands")
+    blur = (["gauss5", "identity", "identity"], [True, False, False])
+    await configure(dut, *blur)
+    assert_frames_equal(await request_frame(dut), expected(*blur), "next full command")
+
+
+@cocotb.test()
+async def nonexistent_kernel_is_rejected(dut):
+    """Номер ядра 3 при трёх ядрах: команда игнорируется, остаётся прежняя цепочка."""
+    await setup(dut)
+    edges = (["gauss5", "gauss5", "log5"], [False, False, True])
+    await configure(dut, *edges)
+    await uart_send(dut, dut.uart_rx_i, bytes([ord("c"), 0b111, 3]), CLKS_PER_BIT)
+    assert_frames_equal(await request_frame(dut), expected(*edges), "after invalid command")

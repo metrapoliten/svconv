@@ -13,6 +13,12 @@
 //                   любой принятый байт отменяет ожидание
 //   'p'             период кадров камеры в тактах clk_i — 4 байта, младший первым
 //
+// Настройка из команды 'c' применяется, только если получены оба байта и все номера ядер
+// допустимы (< NumKernels); иначе команда отбрасывается. Незавершённая команда 'c'
+// отбрасывается, если следующий байт не пришёл за CmdTimeoutBits битовых интервалов UART
+// (~8,7 мс при 115200 бод). Компьютер восстанавливает обмен так: посылает байт, отменяющий
+// ожидание кадра (например, 'x'), и выжидает тишину на линии дольше этого времени.
+//
 // Домены: clk_i — UART и команды; pclk_i — камера и обработка. Кадры переходят между доменами
 // через двухтактовые кадровые буферы, события — через pulse_sync, настройки — через level_sync.
 module camera_uart #(
@@ -29,7 +35,9 @@ module camera_uart #(
     parameter int unsigned ClkFreq = 27_000_000,
     parameter int unsigned Baud = 115_200,
     parameter logic [NumStages-1:0] DefaultEn = '1,
-    parameter logic [NumStages*SelW-1:0] DefaultSel = '0
+    parameter logic [NumStages*SelW-1:0] DefaultSel = '0,
+    // Сколько битовых интервалов UART ждать следующего байта незавершённой команды.
+    parameter int unsigned CmdTimeoutBits = 1000
 ) (
     input  logic clk_i,
     input  logic rst_i,      // синхронный сброс домена clk_i
@@ -47,8 +55,10 @@ module camera_uart #(
 );
 
   localparam int unsigned Pixels = Width * Height;
-  localparam int unsigned AddrW  = $clog2(Pixels);
-  localparam int unsigned CfgW   = NumStages + NumStages * SelW;
+  localparam int unsigned AddrW = $clog2(Pixels);
+  localparam int unsigned CfgW = NumStages + NumStages * SelW;
+  localparam int unsigned CmdTimeoutClks = CmdTimeoutBits * ((ClkFreq + Baud / 2) / Baud);
+  localparam int unsigned CmdCntW = $clog2(CmdTimeoutClks + 1);
 
   if (NumStages > 8 || NumStages * SelW > 8) begin : g_check_config_width
     $error("camera_uart: chain configuration does not fit into the bytes of command 'c'");
@@ -127,6 +137,16 @@ module camera_uart #(
   state_e state_q;
   logic [1:0] period_idx_q;
   logic [31:0] period_latched_q;
+  logic [NumStages-1:0] pending_en_q;  // байт en команды 'c' до прихода байта sel
+  logic [CmdCntW-1:0] cmd_wait_q;  // тактов без байта внутри незавершённой команды
+
+  // Все номера ядер в байте sel существуют.
+  function automatic logic sel_valid(input logic [NumStages*SelW-1:0] sel);
+    for (int s = 0; s < NumStages; s++) begin
+      if (int'(sel[s*SelW+:SelW]) >= int'(NumKernels)) return 1'b0;
+    end
+    return 1'b1;
+  endfunction
 
   always_ff @(posedge clk_i) begin
     if (rst_i) begin
@@ -140,9 +160,12 @@ module camera_uart #(
       tx_data_q        <= '0;
       period_idx_q     <= '0;
       period_latched_q <= '0;
+      pending_en_q     <= '0;
+      cmd_wait_q       <= '0;
     end else begin
       arm_q <= 1'b0;
       if (tx_valid_q && tx_ready) tx_valid_q <= 1'b0;
+      cmd_wait_q <= (rx_valid || state_q == Idle) ? '0 : cmd_wait_q + 1'b1;
 
       unique case (state_q)
         Idle: begin
@@ -165,15 +188,22 @@ module camera_uart #(
 
         CfgEn: begin
           if (rx_valid) begin
-            stage_en_q <= rx_data[NumStages-1:0];
-            state_q    <= CfgSel;
+            pending_en_q <= rx_data[NumStages-1:0];
+            state_q      <= CfgSel;
+          end else if (cmd_wait_q == CmdCntW'(CmdTimeoutClks)) begin
+            state_q <= Idle;  // команда оборвалась
           end
         end
 
         CfgSel: begin
           if (rx_valid) begin
-            kernel_sel_q <= rx_data[NumStages*SelW-1:0];
-            state_q      <= Idle;
+            if (sel_valid(rx_data[NumStages*SelW-1:0])) begin
+              stage_en_q   <= pending_en_q;
+              kernel_sel_q <= rx_data[NumStages*SelW-1:0];
+            end
+            state_q <= Idle;
+          end else if (cmd_wait_q == CmdCntW'(CmdTimeoutClks)) begin
+            state_q <= Idle;
           end
         end
 
@@ -226,8 +256,10 @@ module camera_uart #(
   // =========================================================================================
   // Домен PCLK: обработка и захват кадра.
   // =========================================================================================
-  // Конфигурация меняется редко, поэтому переходит в домен PCLK синхронизатором уровня (кадр, во
-  // время которого она сменилась, может быть смешанным); запрос кадра — импульсом.
+  // Конфигурация меняется редко, поэтому переходит в домен PCLK синхронизатором уровня; запрос
+  // кадра — импульсом. Кадры вокруг смены конфигурации на выходе цепочки могут быть смешанными
+  // (см. conv_pipeline.sv), но захват начинается только после ready_o, на следующем кадре
+  // камеры, и результат этого кадра целиком вычислен новой конфигурацией.
   logic [CfgW-1:0] cfg_q;
   logic arm_pulse;
 

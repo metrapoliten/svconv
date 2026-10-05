@@ -125,3 +125,35 @@ async def capture_can_be_cancelled(dut):
     await uart_send(dut, dut.uart_rx_i, b"p", CLKS_PER_BIT)
     period = int.from_bytes(await uart_recv(dut, dut.uart_tx_o, 4, CLKS_PER_BIT), "little")
     assert period == 0, "no camera frames, so the period is unknown (0)"
+
+
+# Тайм-аут незавершённой команды стенда (параметр CmdTimeoutBits) с запасом.
+CMD_TIMEOUT_CYCLES = 1000 * CLKS_PER_BIT + 10 * CLKS_PER_BIT
+
+
+@cocotb.test()
+async def truncated_command_is_discarded(dut):
+    """Оборванная команда 'c' отбрасывается по тайм-ауту и не меняет цепочку; следующая
+    полная команда разбирается правильно."""
+    frames = await setup(dut, num_frames=16, seed=4)
+    edges = (["gauss5", "gauss5", "log5"], [False, False, True])
+    await configure(dut, *edges)
+    await uart_send(dut, dut.uart_rx_i, bytes([ord("c"), 0]), CLKS_PER_BIT)
+    await ClockCycles(dut.clk_i, CMD_TIMEOUT_CYCLES)
+    raw, out = await capture(dut)
+    check(raw, out, frames, *edges)
+    blur = (["gauss5", "identity", "identity"], [True, False, False])
+    await configure(dut, *blur)
+    raw, out = await capture(dut)
+    check(raw, out, frames, *blur)
+
+
+@cocotb.test()
+async def nonexistent_kernel_is_rejected(dut):
+    """Номер ядра 3 при трёх ядрах: команда игнорируется, остаётся прежняя цепочка."""
+    frames = await setup(dut, num_frames=8, seed=5)
+    edges = (["gauss5", "gauss5", "log5"], [False, False, True])
+    await configure(dut, *edges)
+    await uart_send(dut, dut.uart_rx_i, bytes([ord("c"), 0b111, 3]), CLKS_PER_BIT)
+    raw, out = await capture(dut)
+    check(raw, out, frames, *edges)

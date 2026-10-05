@@ -13,6 +13,12 @@
 //   'p'             прислать период выходных кадров в тактах — 4 байта, младший первым
 //
 // Пока стенд занят ответом (busy_o), новые команды игнорируются.
+//
+// Настройка из команды 'c' применяется, только если получены оба байта и все номера ядер
+// допустимы (< NumKernels); иначе команда отбрасывается и остаётся прежняя цепочка. Если
+// следующий байт команды 'c' не пришёл за CmdTimeoutBits битовых интервалов UART (~8,7 мс при
+// 115200 бод), команда тоже отбрасывается — так потерянный байт не сдвигает разбор следующих
+// команд. Компьютер восстанавливает обмен, выждав тишину на линии дольше этого времени.
 module uart_bench #(
     parameter int unsigned Width = 160,
     parameter int unsigned Height = 120,
@@ -29,7 +35,9 @@ module uart_bench #(
     parameter int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1,
     // Конфигурация после сброса.
     parameter logic [NumStages-1:0] DefaultEn = '1,
-    parameter logic [NumStages*SelW-1:0] DefaultSel = '0
+    parameter logic [NumStages*SelW-1:0] DefaultSel = '0,
+    // Сколько битовых интервалов UART ждать следующего байта незавершённой команды.
+    parameter int unsigned CmdTimeoutBits = 1000
 ) (
     input  logic clk_i,
     input  logic rst_i,      // синхронный сброс, активный уровень 1
@@ -40,7 +48,9 @@ module uart_bench #(
 );
 
   localparam int unsigned Pixels = Width * Height;
-  localparam int unsigned AddrW  = $clog2(Pixels);
+  localparam int unsigned AddrW = $clog2(Pixels);
+  localparam int unsigned CmdTimeoutClks = CmdTimeoutBits * ((ClkFreq + Baud / 2) / Baud);
+  localparam int unsigned CmdCntW = $clog2(CmdTimeoutClks + 1);
 
   // Настройка цепочки передаётся одним байтом на поле.
   if (NumStages > 8 || NumStages * SelW > 8) begin : g_check_config_width
@@ -179,6 +189,16 @@ module uart_bench #(
   state_e state_q;
   logic [1:0] period_idx_q;
   logic [31:0] period_latched_q;
+  logic [NumStages-1:0] pending_en_q;  // байт en команды 'c' до прихода байта sel
+  logic [CmdCntW-1:0] cmd_wait_q;  // тактов без байта внутри незавершённой команды
+
+  // Все номера ядер в байте sel существуют.
+  function automatic logic sel_valid(input logic [NumStages*SelW-1:0] sel);
+    for (int s = 0; s < NumStages; s++) begin
+      if (int'(sel[s*SelW+:SelW]) >= int'(NumKernels)) return 1'b0;
+    end
+    return 1'b1;
+  endfunction
 
   // Пиксель кадра записывается в буфер в состоянии Capture, а первый пиксель — в тот же
   // такт, когда приходит его sof (переход из WaitSecond).
@@ -195,8 +215,11 @@ module uart_bench #(
       tx_data_q        <= '0;
       period_idx_q     <= '0;
       period_latched_q <= '0;
+      pending_en_q     <= '0;
+      cmd_wait_q       <= '0;
     end else begin
       if (tx_valid_q && tx_ready) tx_valid_q <= 1'b0;
+      cmd_wait_q <= (rx_valid || state_q == Idle) ? '0 : cmd_wait_q + 1'b1;
 
       unique case (state_q)
         Idle: begin
@@ -216,15 +239,22 @@ module uart_bench #(
 
         CfgEn: begin
           if (rx_valid) begin
-            stage_en_q <= rx_data[NumStages-1:0];
-            state_q    <= CfgSel;
+            pending_en_q <= rx_data[NumStages-1:0];
+            state_q      <= CfgSel;
+          end else if (cmd_wait_q == CmdCntW'(CmdTimeoutClks)) begin
+            state_q <= Idle;  // команда оборвалась
           end
         end
 
         CfgSel: begin
           if (rx_valid) begin
-            kernel_sel_q <= rx_data[NumStages*SelW-1:0];
-            state_q      <= Idle;
+            if (sel_valid(rx_data[NumStages*SelW-1:0])) begin
+              stage_en_q   <= pending_en_q;
+              kernel_sel_q <= rx_data[NumStages*SelW-1:0];
+            end
+            state_q <= Idle;
+          end else if (cmd_wait_q == CmdCntW'(CmdTimeoutClks)) begin
+            state_q <= Idle;
           end
         end
 
