@@ -6,11 +6,17 @@
 // K*K весов построчно (дополнительный код), затем байт настройки {abs, 0, 0, 0, shift[3:0]}.
 // Содержимое читается из InitFile ($readmemh), который генерирует model/gen_hex.py.
 //
-// После сброса и при каждой смене sel_i модуль по одному байту за такт читает запись ядра
-// и одновременно обновляет weights_o, shift_o и abs_o; если sel_i меняется посреди загрузки,
-// она начинается заново. При неизменном sel_i ready_o появляется не позже чем через K*K + 3
-// такта (доказано в formal/kernel_rom). Дальше веса берутся из
-// регистров — ПЗУ не читается для каждого пикселя. ready_o = 1, когда выходы соответствуют sel_i.
+// После сброса и при каждой смене sel_i модуль по одному байту за такт читает запись ядра в
+// промежуточный регистр и по её последнему байту разом обновляет weights_o, shift_o и abs_o;
+// если sel_i меняется на другой существующий номер посреди загрузки, она начинается заново.
+// При неизменном sel_i ready_o появляется не позже чем через K*K + 3 такта (доказано в
+// formal/kernel_rom). Дальше веса берутся из регистров — ПЗУ не читается для каждого пикселя.
+// ready_o = 1, когда выходы соответствуют sel_i.
+//
+// Номер ядра вне 0..NumKernels-1 (возможен, если NumKernels не степень двойки) не начинает
+// загрузку, и пока он выбран, ready_o = 0. Загрузка, начатая до него, доводится до конца:
+// выходы переключатся на ядро этой загрузки (ready_o при этом остаётся 0). Без начатой
+// загрузки выходы сохраняют последнее загруженное ядро.
 module kernel_rom #(
     parameter int unsigned K = 5,
     parameter int unsigned NumKernels = 3,
@@ -38,6 +44,9 @@ module kernel_rom #(
   localparam int unsigned IdxW = $clog2(Entry + 1);
 
   logic [7:0] rom[Depth];
+
+  logic sel_ok;
+  assign sel_ok = int'(sel_i) < int'(NumKernels);
 
   initial $readmemh(InitFile, rom);
 
@@ -70,15 +79,16 @@ module kernel_rom #(
       addr_q       <= '0;
     end else if (!loading_q) begin
       rd_valid_q <= 1'b0;
-      if (!loaded_q || sel_i != loaded_sel_q) begin
+      if (sel_ok && (!loaded_q || sel_i != loaded_sel_q)) begin
         loading_q    <= 1'b1;
         target_sel_q <= sel_i;
         addr_q       <= AddrW'(sel_i) * AddrW'(Entry);
         issue_idx_q  <= IdxW'(1);
         rd_valid_q   <= 1'b0;
       end
-    end else if (sel_i != target_sel_q) begin
-      // Выбор сменился посреди загрузки — начинаем загрузку нового ядра сразу.
+    end else if (sel_ok && sel_i != target_sel_q) begin
+      // Выбор сменился посреди загрузки — начинаем загрузку нового ядра сразу (несуществующий
+      // номер загрузку не прерывает).
       target_sel_q <= sel_i;
       addr_q       <= AddrW'(sel_i) * AddrW'(Entry);
       issue_idx_q  <= IdxW'(1);
@@ -116,6 +126,25 @@ module kernel_rom #(
     end
   end
 
-  assign ready_o = loaded_q && !loading_q && (sel_i == loaded_sel_q);
+  assign ready_o = sel_ok && loaded_q && !loading_q && (sel_i == loaded_sel_q);
+
+`ifdef FORMAL
+  // Инварианты для доказательства k-индукцией (formal/kernel_rom): без них решатель может
+  // начать с недостижимого состояния — например, с мусора в выходных регистрах, пока выбран
+  // несуществующий номер и загрузки нет. В такте сброса регистры ещё не определены.
+  always_comb begin
+    if (!rst_i) begin
+      assert (int'(loaded_sel_q) < int'(NumKernels));
+      assert (int'(target_sel_q) < int'(NumKernels));
+      if (loaded_q && !loading_q) begin
+        for (int i = 0; i < NumWeights; i++) begin
+          assert (weights_o[i*8+:8] == rom[int'(loaded_sel_q)*Entry+i]);
+        end
+        assert (shift_o == rom[int'(loaded_sel_q)*Entry+NumWeights][3:0]);
+        assert (abs_o == rom[int'(loaded_sel_q)*Entry+NumWeights][7]);
+      end
+    end
+  end
+`endif
 
 endmodule

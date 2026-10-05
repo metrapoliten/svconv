@@ -83,3 +83,44 @@ async def ready_drops_on_change(dut):
     assert dut.ready_o.value == 0
     await wait_ready(dut, LOAD_CYCLES)
     check_outputs(dut, 1)
+
+
+@cocotb.test()
+async def invalid_selection_is_not_loaded(dut):
+    """Несуществующий номер ядра (при NumKernels не степени двойки): ready_o = 0, выходы
+    сохраняют последнее загруженное ядро; после возврата к допустимому номеру всё работает."""
+    sel_w = len(dut.sel_i)
+    invalid = len(KERNEL_ROM_ORDER)
+    assert invalid < (1 << sel_w), "all selector values are valid kernels"
+    await setup(dut, sel=1)
+    await wait_ready(dut, LOAD_CYCLES)
+    dut.sel_i.value = invalid
+    for _ in range(3 * LOAD_CYCLES):
+        await RisingEdge(dut.clk_i)
+        assert dut.ready_o.value == 0, "ready_o asserted for a nonexistent kernel"
+    check_outputs(dut, 1)
+    dut.sel_i.value = 2
+    await wait_ready(dut, LOAD_CYCLES)
+    check_outputs(dut, 2)
+
+
+@cocotb.test()
+async def invalid_selection_during_load(dut):
+    """Несуществующий номер посреди загрузки не прерывает её: выходы переключаются на ядро этой
+    загрузки, но ready_o остаётся 0, пока выбран несуществующий номер; возврат к тому же ядру
+    даёт ready_o без новой загрузки."""
+    invalid = len(KERNEL_ROM_ORDER)
+    await setup(dut, sel=0)
+    await wait_ready(dut, LOAD_CYCLES)
+    check_outputs(dut, 0)
+    dut.sel_i.value = 1
+    await ClockCycles(dut.clk_i, K)  # загрузка ядра 1 началась, но не закончилась
+    dut.sel_i.value = invalid
+    for _ in range(2 * LOAD_CYCLES):
+        await RisingEdge(dut.clk_i)
+        assert dut.ready_o.value == 0, "ready_o asserted for a nonexistent kernel"
+    check_outputs(dut, 1)
+    dut.sel_i.value = 1
+    await RisingEdge(dut.clk_i)
+    await RisingEdge(dut.clk_i)
+    assert dut.ready_o.value == 1, "the loaded kernel is selected again but ready_o is 0"
