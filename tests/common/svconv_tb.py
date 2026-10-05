@@ -225,9 +225,10 @@ def ov7670_registers(writes: list[tuple[int, int, int, int]]) -> dict[int, int]:
 
 def check_ov7670_setup(writes: list[tuple[int, int, int, int]]) -> None:
     """Проверяет по даташиту OV7670 (v1.4, таблица 5), что итоговая настройка даёт то, чего
-    ждёт dvp_capture: VGA 640×480, RGB565 с полным диапазоном и первым байтом R4..R0 G5..G3
-    (рис. 11), непрерывный PCLK, VSYNC = 1 в начале кадра, HREF = 1 на данных, без
-    масштабирования и деления частоты. Для незаписанных регистров — значения после сброса."""
+    ждёт dvp_capture: VGA 640×480, RGB565 (не RGB444) с полным диапазоном и первым байтом
+    R4..R0 G5..G3 (рис. 11), непрерывный PCLK, VSYNC = 1 в начале кадра (меняется по спаду
+    PCLK), HREF = 1 на данных, без масштабирования и деления частоты. Для незаписанных
+    регистров — значения после сброса."""
     r = ov7670_registers(writes)
     com7 = r[0x12]
     assert com7 & 0x80 == 0, f"COM7 = {com7:#04x}: the last write must not reset the sensor"
@@ -237,12 +238,16 @@ def check_ov7670_setup(writes: list[tuple[int, int, int, int]]) -> None:
     com15 = r.get(0x40, 0xC0)
     assert (com15 >> 4) & 3 == 0b01, f"COM15 = {com15:#04x}: RGB565 needs bits 5:4 = 01"
     assert (com15 >> 6) & 3 == 0b11, f"COM15 = {com15:#04x}: full range 00..FF needs bits 7:6 = 11"
+    rgb444 = r.get(0x8C, 0x00)
+    assert rgb444 & 0x02 == 0, f"RGB444 = {rgb444:#04x}: RGB444 is on instead of RGB565"
     com10 = r.get(0x15, 0x00)
     assert com10 & 0x20 == 0, f"COM10 = {com10:#04x}: PCLK must run during blanking"
     assert com10 & 0x10 == 0, f"COM10 = {com10:#04x}: PCLK is reversed"
     assert com10 & 0x08 == 0, f"COM10 = {com10:#04x}: HREF is reversed"
     assert com10 & 0x40 == 0, f"COM10 = {com10:#04x}: HREF is replaced by HSYNC"
     assert com10 & 0x02 == 0, f"COM10 = {com10:#04x}: VSYNC is negative"
+    # Ограничения входов в .sdc считают, что VSYNC, как и данные, меняется по спаду PCLK.
+    assert com10 & 0x04 == 0, f"COM10 = {com10:#04x}: VSYNC changes on the rising edge of PCLK"
     com3 = r.get(0x0C, 0x00)
     assert com3 & 0x40 == 0, f"COM3 = {com3:#04x}: output bytes are swapped"
     assert com3 & 0x0C == 0, f"COM3 = {com3:#04x}: scaling or DCW is on"
