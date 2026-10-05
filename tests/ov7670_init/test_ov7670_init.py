@@ -87,6 +87,8 @@ async def writes_whole_table(dut):
 
     got = [(dev, reg, val) for _, dev, reg, val in monitor.writes]
     assert len(TABLE) == 78
+    # dvp_capture тактируется от PCLK, поэтому PCLK должен идти и в гашении (COM10[5] = 0).
+    assert [val for reg, val in TABLE if reg == 0x15] == [0x00], "COM10 must keep PCLK running"
     assert got == [(0x42, reg, val) for reg, val in TABLE], "SCCB writes differ from the table"
     # Первая запись — программный сброс, после неё пауза не меньше 10 мс.
     assert TABLE[0] == (0x12, 0x80)

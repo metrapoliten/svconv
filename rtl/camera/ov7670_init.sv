@@ -11,6 +11,9 @@
 // https://github.com/AngeloJacobo/FPGA_OV7670_Camera_Interface (src/camera_interface.v),
 // лицензия MIT, Copyright (c) 2021 Angelo Jacobo; автор, в свою очередь, ссылается на
 // https://github.com/jonlwowski012/OV7670_NEXYS4_Verilog. Комментарии к записям — оригинальные.
+// Одно изменение: COM10 = 0x00 (PCLK идёт непрерывно) вместо 0x20 (PCLK стоит в гашении,
+// при HREF = 0). В оригинале PCLK лишь выбирается быстрым системным тактом, а у нас это
+// тактовый сигнал домена захвата: без него dvp_capture не увидел бы ни VSYNC, ни конца строки.
 module ov7670_init #(
     parameter int unsigned ClkFreq  = 27_000_000,  // частота clk_i, Гц
     parameter int unsigned SccbFreq = 100_000
@@ -36,7 +39,7 @@ module ov7670_init #(
     unique case (idx)
       7'd0: ov7670_reg = 16'h12_80;  // reset all register to default values
       7'd1: ov7670_reg = 16'h12_04;  // set output format to RGB
-      7'd2: ov7670_reg = 16'h15_20;  // pclk will not toggle during horizontal blank
+      7'd2: ov7670_reg = 16'h15_00;  // COM10: free running PCLK (see header)
       7'd3: ov7670_reg = 16'h40_D0;  // RGB565
       7'd4: ov7670_reg = 16'h12_04;  // COM7,     set RGB color output
       7'd5: ov7670_reg = 16'h11_80;  // CLKRC     internal PLL matches input clock
