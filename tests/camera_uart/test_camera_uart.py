@@ -81,7 +81,7 @@ async def captures_frame_and_its_result(dut):
 
 @cocotb.test()
 async def reconfigure_and_capture_again(dut):
-    frames = await setup(dut, num_frames=10, seed=2)
+    frames = await setup(dut, num_frames=20, seed=2)
     for cfg in (
         (["identity", "identity", "identity"], [False, False, False]),
         (["gauss5", "identity", "log5"], [True, False, True]),
@@ -100,6 +100,21 @@ async def reports_frame_period(dut):
     period = int.from_bytes(await uart_recv(dut, dut.uart_tx_o, 4, CLKS_PER_BIT), "little")
     frame_ns = PCLK_NS * (VSYNC_LEN + V_BLANK + CAM_H * (2 * CAM_W + H_BLANK))
     assert abs(period - frame_ns / CLK_NS) <= 1, f"period {period}, expected ~{frame_ns / CLK_NS}"
+
+
+@cocotb.test()
+async def first_capture_after_enabling_all_stages(dut):
+    """Все каскады были в обходе, затем включены все три: первый же захват — целиком новая
+    цепочка. Каскад, вход которого переключился, до первого sof на новом входе может выдать
+    лишний sof_o; захват должен его пропустить (так было на плате: первый снимок после смены
+    цепочки не совпадал с моделью)."""
+    frames = await setup(dut, num_frames=60, seed=11)
+    bypass = (["identity"] * 3, [False] * 3)
+    chain = (["gauss5", "gauss5", "log5"], [True] * 3)
+    for cfg in (bypass, chain, bypass, chain):
+        await configure(dut, *cfg)
+        raw, out = await capture(dut)
+        check(raw, out, frames, *cfg)
 
 
 @cocotb.test()
