@@ -28,10 +28,15 @@ module sccb_writer #(
 
   // Период SCCB делится на 4 четверти; линии переключаются по концу четверти (tick). Внутри
   // бита SIOC низкий в четвертях 0-1 и высокий в 2-3; SIOD меняется на границе четвертей 0 и 1 —
-  // в середине низкого уровня SIOC.
-  localparam int unsigned QuarterClks = ClkFreq / (4 * SccbFreq);
+  // в середине низкого уровня SIOC. Число тактов в четверти округляется вверх, чтобы частота
+  // SIOC не превышала SccbFreq.
+  localparam int unsigned QuarterClks = (ClkFreq + 4 * SccbFreq - 1) / (4 * SccbFreq);
   localparam int unsigned QW = (QuarterClks <= 1) ? 1 : $clog2(QuarterClks);
   localparam int unsigned NumBits = 27;  // 3 байта по 9 бит
+
+  if (SccbFreq == 0 || SccbFreq > 400_000) begin : g_check_freq
+    $error("sccb_writer: SccbFreq must be 1..400000 Hz (OV7670 SCCB limit)");
+  end
 
   typedef enum logic [1:0] {
     Idle,
