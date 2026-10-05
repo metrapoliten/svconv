@@ -60,8 +60,15 @@ async def collect(dut, out: list[tuple[int, int]]) -> None:
 
 
 def split_frames(out: list[tuple[int, int]], width: int, height: int) -> list[np.ndarray]:
-    """Режет выходной поток на кадры по sof; возвращает только полностью вышедшие кадры."""
+    """Режет выходной поток на кадры по sof; возвращает только полностью вышедшие кадры.
+
+    Заодно проверяет расстановку sof: между соседними sof ровно width*height пикселей, а после
+    последнего — не больше (иначе лишний или потерянный sof остался бы незамеченным)."""
     starts = [i for i, (sof, _) in enumerate(out) if sof]
+    for a, b in zip(starts, starts[1:]):
+        assert b - a == width * height, f"sof at pixels {a} and {b}: {b - a} pixels apart"
+    if starts:
+        assert len(out) - starts[-1] <= width * height, "pixels after the last frame without sof"
     frames = []
     for s in starts:
         chunk = out[s : s + width * height]

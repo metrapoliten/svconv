@@ -8,7 +8,15 @@ import numpy as np
 from cocotb.triggers import ClockCycles, RisingEdge
 
 from svconv_model import KERNEL_ROM_ORDER, KERNELS, pad_kernel, pipeline
-from svconv_tb import assert_frames_equal, collect, drive, reset, split_frames, start_clock
+from svconv_tb import (
+    UNDEFINED,
+    assert_frames_equal,
+    collect,
+    drive,
+    reset,
+    split_frames,
+    start_clock,
+)
 
 WIDTH = int(os.environ["WIDTH"])
 HEIGHT = int(os.environ["HEIGHT"])
@@ -141,7 +149,12 @@ async def clean_frame_after_reconfiguration(dut):
             await RisingEdge(dut.clk_i)
             cycle += 1
             if dut.valid_o.value == 1:
-                out.append((cycle, int(dut.sof_o.value), int(dut.data_o.value)))
+                # До первого кадра выход читается из ещё не записанных строчных буферов (X), как
+                # в collect(); внутри проверяемого кадра X быть не должно.
+                data = dut.data_o.value
+                out.append(
+                    (cycle, int(dut.sof_o.value), int(data) if data.is_resolvable else UNDEFINED)
+                )
 
     async def feed() -> None:
         """Как drive(), но запоминает, когда начался каждый входной кадр."""
@@ -170,16 +183,30 @@ async def clean_frame_after_reconfiguration(dut):
         await ClockCycles(dut.clk_i, 3 * frame_cycles + n * frame_cycles // num_changes)
         apply(cfg)
         await RisingEdge(dut.clk_i)
-        while dut.ready_o.value != 1:
+        # Ожидания ограничены: потерянный sof или зависшая загрузка ядер не должны превращаться
+        # в бесконечную симуляцию.
+        for _ in range(4 * K * K):
+            if dut.ready_o.value == 1:
+                break
             await RisingEdge(dut.clk_i)
+        else:
+            raise AssertionError(f"change {n}: ready_o not asserted within {4 * K * K} cycles")
         ready_cycle = cycle
-        # Ждём, пока второй после ready_o кадр выйдет целиком.
-        while True:
+        # Ждём, пока второй после ready_o кадр выйдет целиком (с паузами — до ~3,5 кадров).
+        limit = 5 * frame_cycles
+        for _ in range(limit):
             starts = [i for i, (c, s, _) in enumerate(out) if s and c > ready_cycle]
             if len(starts) >= 2 and len(out) >= starts[1] + WIDTH * HEIGHT:
                 break
             await RisingEdge(dut.clk_i)
-        got = np.array([d for _, _, d in out[starts[1] : starts[1] + WIDTH * HEIGHT]], dtype=np.uint8)
+        else:
+            raise AssertionError(
+                f"change {n}: within {limit} cycles after ready_o got {len(starts)} sof_o and "
+                f"{sum(c > ready_cycle for c, _, _ in out)} output pixels"
+            )
+        got = [d for _, _, d in out[starts[1] : starts[1] + WIDTH * HEIGHT]]
+        assert UNDEFINED not in got, f"change {n}: undefined pixels inside the checked frame"
+        got = np.array(got, dtype=np.uint8)
         got = got.reshape(HEIGHT, WIDTH)
         # Выход отстаёт от входа меньше чем на кадр (HEIGHT > NUM_STAGES * (p + 1)), поэтому
         # выходной кадр — результат входного кадра, который подавался в момент его sof_o.

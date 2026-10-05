@@ -173,3 +173,13 @@ def test_decimate_takes_top_left_of_each_block() -> None:
     np.testing.assert_array_equal(decimate(img, 4, 2, 1), [[0, 4]])
     with pytest.raises(ValueError):
         decimate(img, 4, 4, 2)
+
+
+@pytest.mark.parametrize("k", [0, -1, 4, 6])
+def test_window_size_must_be_positive_odd(k: int) -> None:
+    """Окно чётного размера у каскада невозможно: pad_kernel и ПЗУ ядер его отклоняют, иначе
+    запись ПЗУ получила бы не тот размер (при k = 6 — 26 байт вместо 37)."""
+    with pytest.raises(ValueError):
+        pad_kernel(KERNELS["identity"], k)
+    with pytest.raises(ValueError):
+        kernel_rom_bytes(k)

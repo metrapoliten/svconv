@@ -46,8 +46,7 @@ format:
 	@set -e; for f in $(SV_SOURCES); do verible-verilog-format --verify $$f; done
 
 # Доказательства идут от секунд до ~3 минут (дольше всех — uart_rx), все вместе — около 5 минут;
-# одно можно запустить
-# так: make formal SBY_FILES=formal/uart_tx/uart_tx.sby
+# одно можно запустить так: make formal SBY_FILES=formal/uart_tx/uart_tx.sby
 formal:
 	python3 model/gen_hex.py random --count 78 --seed 1 -o formal/kernel_rom/rom.hex
 	@set -e; for f in $(SBY_FILES); do echo "== $$f"; (cd $$(dirname $$f) && $(SBY) -f $$(basename $$f)); done

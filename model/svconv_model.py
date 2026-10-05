@@ -95,6 +95,8 @@ KERNEL_ROM_ORDER = ["identity", "gauss5", "log5"]
 def pad_kernel(kernel: Kernel, k: int) -> Kernel:
     """Дополняет ядро нулями до k×k: аппаратный каскад всегда работает с окном k×k,
     поэтому и обнуляемая рамка у него шириной k // 2, а не kernel.size // 2."""
+    if k <= 0 or k % 2 == 0:
+        raise ValueError(f"window size must be a positive odd number, got {k}")
     if kernel.size > k:
         raise ValueError(f"{kernel.name}: kernel {kernel.size}x{kernel.size} is larger than window {k}x{k}")
     pad = (k - kernel.size) // 2
