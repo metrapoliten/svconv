@@ -15,7 +15,7 @@ COCOTB_TOPLEVEL     := camera_display
 COCOTB_TEST_MODULES := test_camera_display
 # Конфигурация как на Mega 138K Pro, но в маленьком масштабе: кадр камеры 16×12 без
 # прореживания, экран 40×30, без увеличения (картинка по центру), цвет RGB666.
-# Прореживание проверяет tests/camera_uart.
+# Прореживание доказано формально: formal/frame_decimator.
 COMPILE_ARGS += -Pcamera_display.Width=16 -Pcamera_display.Height=12 -Pcamera_display.Factor=1 \
                 -Pcamera_display.HActive=40 -Pcamera_display.HFront=3 -Pcamera_display.HSync=4 \
                 -Pcamera_display.HBack=5 -Pcamera_display.VActive=30 -Pcamera_display.VFront=2 \

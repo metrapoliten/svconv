@@ -20,7 +20,7 @@
 // гарантированно будет выходной кадр, который начнётся первым после второго sof_i, пришедшего
 // после смены при ready_o = 1. Первый входной кадр выравнивает все каскады, и его результат
 // выходит раньше начала второго, если кадр длиннее задержки цепочки — так всегда при
-// Height > NumStages * (p + 1). Так поступают uart_bench и camera_uart.
+// Height > NumStages * (p + 1). Так ждёт тест tests/camera_lcd_top_modes.
 module conv_pipeline #(
     parameter int unsigned Width = 160,
     parameter int unsigned Height = 120,

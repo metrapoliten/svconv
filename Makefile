@@ -46,7 +46,7 @@ format:
 	@set -e; for f in $(SV_SOURCES); do verible-verilog-format --verify $$f; done
 
 # Доказательства идут от секунд до ~1.5 минуты (дольше всех — kernel_rom), все вместе — около 3 минут;
-# одно можно запустить так: make formal SBY_FILES=formal/uart_tx/uart_tx.sby
+# одно можно запустить так: make formal SBY_FILES=formal/video_timing/video_timing.sby
 formal:
 	python3 model/gen_hex.py random --count 78 --seed 1 -o formal/kernel_rom/rom.hex
 	@set -e; for f in $(SBY_FILES); do echo "== $$f"; (cd $$(dirname $$f) && $(SBY) -f $$(basename $$f)); done

@@ -101,49 +101,6 @@ def unpack_weights(value: int, k: int) -> np.ndarray:
     return np.array([b - 256 if b > 127 else b for b in raw]).reshape(k, k)
 
 
-async def uart_send(dut, line, data: bytes, clks_per_bit: int, clk=None) -> None:
-    """Передаёт байты по линии line (8N1), длина бита — clks_per_bit тактов clk (по умолчанию
-    dut.clk_i)."""
-    clk = dut.clk_i if clk is None else clk
-    for byte in data:
-        for bit in [0] + [(byte >> i) & 1 for i in range(8)] + [1]:
-            line.value = bit
-            await ClockCycles(clk, clks_per_bit)
-
-
-async def wait_start_bit(
-    dut, line, clks_per_bit: int, timeout_bits: int = 1000, clk=None, what: str = ""
-) -> None:
-    """Ждёт старт-бит (линия в 0) не дольше timeout_bits бит; what дополняет сообщение об ошибке."""
-    clk = dut.clk_i if clk is None else clk
-    idle = 0
-    while line.value == 1:
-        await RisingEdge(clk)
-        idle += 1
-        assert idle < timeout_bits * clks_per_bit, f"UART: no start bit{what}"
-
-
-async def uart_recv(
-    dut, line, count: int, clks_per_bit: int, timeout_bits: int = 1000, clk=None
-) -> bytes:
-    """Принимает count байт с линии line (8N1), выбирая биты в их серединах; clk — такт, в
-    котором задана длина бита (по умолчанию dut.clk_i)."""
-    clk = dut.clk_i if clk is None else clk
-    out = bytearray()
-    for _ in range(count):
-        await wait_start_bit(dut, line, clks_per_bit, timeout_bits, clk, f", got {len(out)} bytes")
-        await ClockCycles(clk, clks_per_bit // 2)
-        assert line.value == 0, "UART: start bit too short"
-        byte = 0
-        for i in range(8):
-            await ClockCycles(clk, clks_per_bit)
-            byte |= int(line.value) << i
-        await ClockCycles(clk, clks_per_bit)
-        assert line.value == 1, "UART: no stop bit"
-        out.append(byte)
-    return bytes(out)
-
-
 async def dvp_camera(
     dut,
     frames: list[np.ndarray],
