@@ -19,21 +19,14 @@ module camera_display #(
     // verilog_lint: waive explicit-parameter-storage-type
     parameter KernelFile = "kernels.hex",
     parameter int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1,
-    // Дисплей.
-    parameter int unsigned HActive = 480,
-    parameter int unsigned HFront = 2,
-    parameter int unsigned HSync = 41,
-    parameter int unsigned HBack = 2,
-    parameter int unsigned VActive = 272,
-    parameter int unsigned VFront = 2,
-    parameter int unsigned VSync = 10,
-    parameter int unsigned VBack = 2,
-    parameter bit HSyncPol = 1'b0,
-    parameter bit VSyncPol = 1'b0,
-    parameter int unsigned Scale = 2,
-    parameter int unsigned RBits = 5,
+    // Дисплей (режим DE, см. video_timing).
+    parameter int unsigned HActive = 800,
+    parameter int unsigned HBlank = 392,
+    parameter int unsigned VActive = 480,
+    parameter int unsigned VBlank = 53,
+    parameter int unsigned RBits = 6,
     parameter int unsigned GBits = 6,
-    parameter int unsigned BBits = 5
+    parameter int unsigned BBits = 6
 ) (
     // Камера.
     input logic       pclk_i,
@@ -49,9 +42,7 @@ module camera_display #(
 
     // Дисплей.
     input  logic             lcd_clk_i,
-    input  logic             rst_lcd_i,    // синхронный сброс в домене LCD
-    output logic             lcd_hsync_o,
-    output logic             lcd_vsync_o,
+    input  logic             rst_lcd_i,  // синхронный сброс в домене LCD
     output logic             lcd_de_o,
     output logic [RBits-1:0] lcd_r_o,
     output logic [GBits-1:0] lcd_g_o,
@@ -109,18 +100,11 @@ module camera_display #(
   // --- Домен LCD --------------------------------------------------------------------------
   lcd_output #(
       .HActive  (HActive),
-      .HFront   (HFront),
-      .HSync    (HSync),
-      .HBack    (HBack),
+      .HBlank   (HBlank),
       .VActive  (VActive),
-      .VFront   (VFront),
-      .VSync    (VSync),
-      .VBack    (VBack),
-      .HSyncPol (HSyncPol),
-      .VSyncPol (VSyncPol),
+      .VBlank   (VBlank),
       .SrcWidth (Width),
       .SrcHeight(Height),
-      .Scale    (Scale),
       .RBits    (RBits),
       .GBits    (GBits),
       .BBits    (BBits)
@@ -129,8 +113,6 @@ module camera_display #(
       .rst_i    (rst_lcd_i),
       .fb_addr_o(fb_addr),
       .fb_data_i(fb_data),
-      .hsync_o  (lcd_hsync_o),
-      .vsync_o  (lcd_vsync_o),
       .de_o     (lcd_de_o),
       .r_o      (lcd_r_o),
       .g_o      (lcd_g_o),

@@ -9,7 +9,7 @@ import random
 import cocotb
 import numpy as np
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, First, RisingEdge, with_timeout
+from cocotb.triggers import ClockCycles, FallingEdge, First, ReadOnly, RisingEdge, with_timeout
 
 # Значение неопределённого (X/Z) выходного пикселя.
 UNDEFINED = -1
@@ -99,6 +99,73 @@ def unpack_weights(value: int, k: int) -> np.ndarray:
     """Обратное к pack_weights: вектор весов -> знаковая матрица K×K."""
     raw = [(value >> (8 * idx)) & 0xFF for idx in range(k * k)]
     return np.array([b - 256 if b > 127 else b for b in raw]).reshape(k, k)
+
+
+async def capture_screen(
+    clk,
+    de,
+    r,
+    g,
+    b,
+    size: tuple[int, int],
+    total: tuple[int, int],
+    clk_period_ns: float,
+    bits: tuple[int, int, int] = (6, 6, 6),
+    timeout_frames: int = 3,
+) -> np.ndarray:
+    """Один кадр экрана RGB-LCD в режиме DE (сигналы clk, de, r, g, b) — так, как его принимает
+    панель: сигналы выбираются по спаду такта дисплея. Экран size = (ширина, высота), полный
+    период total = (тактов в строке, строк в кадре). Проверяет интерфейс: RGB и DE не меняются на
+    спаде такта, в кадре «высота» строк по «ширина» тактов с DE = 1, период строки и кадра — по
+    total. Всё — не дольше timeout_frames кадров. Цвет упакован как в gray_to_rgb() модели."""
+    width, height = size
+    h_total, v_total = total
+    timeout_ns = round(timeout_frames * h_total * v_total * clk_period_ns)
+    cycle = 0
+
+    def outputs() -> tuple[int, int, int, int]:
+        return int(de.value), int(r.value), int(g.value), int(b.value)
+
+    async def next_sample() -> tuple[int, int, int, int]:
+        nonlocal cycle
+        await FallingEdge(clk)
+        cycle += 1
+        sample = outputs()
+        await ReadOnly()
+        assert outputs() == sample, f"RGB/DE change at the falling clock edge {cycle}"
+        return sample
+
+    async def capture() -> np.ndarray:
+        # Начало кадра — DE = 1 после паузы длиннее строки (между строками пауза короче).
+        idle = 0
+        while True:
+            de_v, r_v, g_v, b_v = await next_sample()
+            if de_v and idle > h_total:
+                break
+            idle = 0 if de_v else idle + 1
+        frame_start = cycle
+        line_starts: list[int] = []
+        pixels = []
+        prev_de = 0
+        while True:
+            if de_v and not prev_de:  # начало строки
+                if len(line_starts) == height:  # первая строка следующего кадра
+                    break
+                line_starts.append(cycle)
+            if de_v:
+                pixels.append((r_v << (bits[1] + bits[2])) | (g_v << bits[2]) | b_v)
+            if not de_v and prev_de:  # конец строки
+                run = cycle - line_starts[-1]
+                assert run == width, f"line {len(line_starts) - 1}: DE = 1 for {run} clocks"
+            prev_de = de_v
+            de_v, r_v, g_v, b_v = await next_sample()
+        periods = set(np.diff(line_starts).tolist())
+        assert periods == {h_total}, f"line periods {sorted(periods)} clocks, expected {h_total}"
+        frame = cycle - frame_start
+        assert frame == h_total * v_total, f"frame period {frame}, expected {h_total * v_total}"
+        return np.array(pixels, dtype=np.uint32).reshape(height, width)
+
+    return await with_timeout(capture(), timeout_ns, "ns")
 
 
 async def dvp_camera(

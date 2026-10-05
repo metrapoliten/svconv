@@ -222,15 +222,15 @@ def gray_to_rgb(img: np.ndarray, bits: tuple[int, int, int] = (5, 6, 5)) -> np.n
 
 
 def display_frame(
-    img: np.ndarray, width: int, height: int, scale: int, bits: tuple[int, int, int] = (5, 6, 5)
+    img: np.ndarray, width: int, height: int, bits: tuple[int, int, int] = (6, 6, 6)
 ) -> np.ndarray:
-    """Что видно на экране width×height (цвет упакован как в gray_to_rgb): img, увеличенное в scale
-    раз повторением пикселей и размещённое по центру (смещения округляются вниз), вокруг — чёрный."""
-    big = np.kron(np.asarray(img, dtype=np.uint8), np.ones((scale, scale), dtype=np.uint8))
-    h, w = big.shape
+    """Что видно на экране width×height (цвет упакован как в gray_to_rgb): img по центру
+    (смещения округляются вниз), вокруг — чёрный."""
+    img = np.asarray(img, dtype=np.uint8)
+    h, w = img.shape
     if w > width or h > height:
-        raise ValueError(f"scaled image {w}x{h} does not fit the display {width}x{height}")
+        raise ValueError(f"image {w}x{h} does not fit the display {width}x{height}")
     screen = np.zeros((height, width), dtype=np.uint32)
     off_x, off_y = (width - w) // 2, (height - h) // 2
-    screen[off_y : off_y + h, off_x : off_x + w] = gray_to_rgb(big, bits)
+    screen[off_y : off_y + h, off_x : off_x + w] = gray_to_rgb(img, bits)
     return screen

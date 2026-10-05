@@ -3,19 +3,14 @@
 // Обёртка для теста: кадровый буфер (домен записи clk_w_i) + lcd_output (домен clk_pix_i).
 module lcd_output_tb #(
     parameter int unsigned HActive = 40,
-    parameter int unsigned HFront = 3,
-    parameter int unsigned HSync = 4,
-    parameter int unsigned HBack = 5,
+    parameter int unsigned HBlank = 12,
     parameter int unsigned VActive = 30,
-    parameter int unsigned VFront = 2,
-    parameter int unsigned VSync = 3,
-    parameter int unsigned VBack = 4,
+    parameter int unsigned VBlank = 9,
     parameter int unsigned SrcWidth = 16,
     parameter int unsigned SrcHeight = 12,
-    parameter int unsigned Scale = 2,
-    parameter int unsigned RBits = 5,
+    parameter int unsigned RBits = 6,
     parameter int unsigned GBits = 6,
-    parameter int unsigned BBits = 5
+    parameter int unsigned BBits = 6
 ) (
     input logic       clk_w_i,
     input logic       rst_w_i,
@@ -25,8 +20,6 @@ module lcd_output_tb #(
 
     input  logic             clk_pix_i,
     input  logic             rst_pix_i,
-    output logic             hsync_o,
-    output logic             vsync_o,
     output logic             de_o,
     output logic [RBits-1:0] r_o,
     output logic [GBits-1:0] g_o,
@@ -54,18 +47,11 @@ module lcd_output_tb #(
 
   lcd_output #(
       .HActive  (HActive),
-      .HFront   (HFront),
-      .HSync    (HSync),
-      .HBack    (HBack),
+      .HBlank   (HBlank),
       .VActive  (VActive),
-      .VFront   (VFront),
-      .VSync    (VSync),
-      .VBack    (VBack),
-      .HSyncPol (1'b0),
-      .VSyncPol (1'b0),
+      .VBlank   (VBlank),
       .SrcWidth (SrcWidth),
       .SrcHeight(SrcHeight),
-      .Scale    (Scale),
       .RBits    (RBits),
       .GBits    (GBits),
       .BBits    (BBits)
@@ -74,8 +60,6 @@ module lcd_output_tb #(
       .rst_i    (rst_pix_i),
       .fb_addr_o(fb_addr),
       .fb_data_i(fb_data),
-      .hsync_o  (hsync_o),
-      .vsync_o  (vsync_o),
       .de_o     (de_o),
       .r_o      (r_o),
       .g_o      (g_o),

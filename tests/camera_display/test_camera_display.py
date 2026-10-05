@@ -1,5 +1,5 @@
 """Сквозной тест camera_display: кадр с модели камеры DVP появляется на экране LCD так, как
-предсказывает модель (серый -> цепочка свёрток -> увеличение и центрирование).
+предсказывает модель (серый -> цепочка свёрток -> центрирование).
 Размеры совпадают с параметрами в Makefile."""
 
 import os
@@ -7,7 +7,7 @@ import os
 import cocotb
 import numpy as np
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, FallingEdge, RisingEdge
+from cocotb.triggers import ClockCycles, RisingEdge
 
 from svconv_model import (
     KERNEL_ROM_ORDER,
@@ -18,29 +18,19 @@ from svconv_model import (
     rgb565_to_rgb888,
     rgb888_to_gray,
 )
-from svconv_tb import dvp_camera
+from svconv_tb import capture_screen, dvp_camera
 
 K = int(os.environ["K"])
 CAM_W, CAM_H = 16, 12
-SCREEN_W, SCREEN_H, SCALE = 40, 30, 1
-BITS = (6, 6, 6)  # RGB666, как в Makefile
+SCREEN = (40, 30)
+TOTAL = (40 + 12, 30 + 9)
+LCD_PERIOD_NS = 13
 SEL_W = max(1, (len(KERNEL_ROM_ORDER) - 1).bit_length())
-
-
-async def capture_screen(dut) -> np.ndarray:
-    await FallingEdge(dut.lcd_vsync_o)
-    pixels = []
-    while len(pixels) < SCREEN_W * SCREEN_H:
-        await RisingEdge(dut.lcd_clk_i)
-        if dut.lcd_de_o.value == 1:
-            r, g, b = int(dut.lcd_r_o.value), int(dut.lcd_g_o.value), int(dut.lcd_b_o.value)
-            pixels.append((r << (BITS[1] + BITS[2])) | (g << BITS[2]) | b)
-    return np.array(pixels, dtype=np.uint32).reshape(SCREEN_H, SCREEN_W)
 
 
 async def run(dut, kernels: list[str], enabled: list[bool], seed: int) -> None:
     cocotb.start_soon(Clock(dut.pclk_i, 10, unit="ns").start())
-    cocotb.start_soon(Clock(dut.lcd_clk_i, 13, unit="ns").start())
+    cocotb.start_soon(Clock(dut.lcd_clk_i, LCD_PERIOD_NS, unit="ns").start())
     dut.stage_en_i.value = sum(int(e) << s for s, e in enumerate(enabled))
     dut.kernel_sel_i.value = sum(
         KERNEL_ROM_ORDER.index(n) << (s * SEL_W) for s, n in enumerate(kernels)
@@ -69,11 +59,20 @@ async def run(dut, kernels: list[str], enabled: list[bool], seed: int) -> None:
     # «разрыва» между разными кадрами.
     rgb565 = np.random.default_rng(seed).integers(0, 1 << 16, (CAM_H, CAM_W), dtype=np.uint16)
     await dvp_camera(dut, [rgb565] * 4)
-    screen = await capture_screen(dut)
+    screen = await capture_screen(
+        dut.lcd_clk_i,
+        dut.lcd_de_o,
+        dut.lcd_r_o,
+        dut.lcd_g_o,
+        dut.lcd_b_o,
+        SCREEN,
+        TOTAL,
+        LCD_PERIOD_NS,
+    )
 
     gray = rgb888_to_gray(rgb565_to_rgb888(rgb565))
     chain = [pad_kernel(KERNELS[n], K) for n, e in zip(kernels, enabled) if e]
-    expected = display_frame(pipeline(gray, chain), SCREEN_W, SCREEN_H, SCALE, BITS)
+    expected = display_frame(pipeline(gray, chain), *SCREEN)
     bad = np.argwhere(screen != expected)
     assert not len(bad), (
         f"{len(bad)} mismatching screen pixels, first at {tuple(int(v) for v in bad[0])}: "

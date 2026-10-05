@@ -7,81 +7,17 @@ PLL Gowin (35 МГц для дисплея, 25 МГц для XCLK), запуск
 import cocotb
 import numpy as np
 from cocotb.clock import Clock
-from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge, Timer, with_timeout
+from cocotb.triggers import RisingEdge, Timer
 
 from svconv_model import KERNELS, display_frame, pipeline, rgb565_to_rgb888, rgb888_to_gray
-from svconv_tb import dvp_camera, ov7670_power_up
+from svconv_tb import capture_screen, dvp_camera, ov7670_power_up
 
 CAM_W, CAM_H = 640, 480
-SCREEN_W, SCREEN_H = 800, 480
-BITS = (6, 6, 6)
-# Тайминги дисплея в camera_lcd_top: строка 800 + 210 + 1 + 181 тактов, кадр 480 + 45 + 1 + 7 строк.
-H_TOTAL = SCREEN_W + 210 + 1 + 181
-V_TOTAL = SCREEN_H + 45 + 1 + 7
+SCREEN = (800, 480)
+# Тайминги дисплея в camera_lcd_top: строка 800 + 392 такта гашения, кадр 480 + 53 строки.
+TOTAL = (800 + 392, 480 + 53)
 LCD_PERIOD_NS = 1000 / 35
 DEFAULT_CHAIN = ["gauss5", "gauss5", "log5"]  # режим 0 в camera_lcd_top
-
-
-def _lcd_outputs(dut) -> tuple[int, int, int, int]:
-    return (
-        int(dut.lcd_de_o.value),
-        int(dut.lcd_r_o.value),
-        int(dut.lcd_g_o.value),
-        int(dut.lcd_b_o.value),
-    )
-
-
-async def capture_screen(dut, timeout_frames: int = 3) -> np.ndarray:
-    """Один кадр экрана — так, как его принимает панель: только по выводам разъёма, сигналы
-    выбираются по спаду DCLK (ILI6122 при CLKPOL = L). Проверяет интерфейс: RGB и DE не меняются
-    на спаде DCLK, в кадре 480 строк по 800 тактов с DE = 1, период строки — H_TOTAL тактов,
-    кадра — V_TOTAL строк. Всё — не дольше timeout_frames кадров дисплея."""
-    timeout_ns = round(timeout_frames * V_TOTAL * H_TOTAL * LCD_PERIOD_NS)
-    return await with_timeout(_capture_screen(dut), timeout_ns, "ns")
-
-
-async def _capture_screen(dut) -> np.ndarray:
-    cycle = 0
-
-    async def next_sample() -> tuple[int, int, int, int]:
-        nonlocal cycle
-        await FallingEdge(dut.lcd_clk_o)
-        cycle += 1
-        sample = _lcd_outputs(dut)
-        await ReadOnly()
-        assert _lcd_outputs(dut) == sample, f"RGB/DE change at the falling edge of DCLK {cycle}"
-        return sample
-
-    # Начало кадра — DE = 1 после паузы длиннее строки (между строками пауза короче).
-    idle = 0
-    while True:
-        de, r, g, b = await next_sample()
-        if de and idle > H_TOTAL:
-            break
-        idle = 0 if de else idle + 1
-
-    frame_start = cycle
-    line_starts = []
-    pixels = []
-    prev_de = 0
-    while True:
-        if de and not prev_de:  # начало строки
-            if len(line_starts) == SCREEN_H:  # первая строка следующего кадра
-                break
-            line_starts.append(cycle)
-        if de:
-            pixels.append((r << (BITS[1] + BITS[2])) | (g << BITS[2]) | b)
-        if not de and prev_de:  # конец строки
-            run = cycle - line_starts[-1]
-            assert run == SCREEN_W, f"line {len(line_starts) - 1}: DE = 1 for {run} clocks"
-        prev_de = de
-        de, r, g, b = await next_sample()
-
-    periods = set(np.diff(line_starts).tolist())
-    assert periods == {H_TOTAL}, f"line periods {sorted(periods)} clocks, expected {H_TOTAL}"
-    frame = cycle - frame_start
-    assert frame == V_TOTAL * H_TOTAL, f"frame period {frame} clocks, expected {V_TOTAL * H_TOTAL}"
-    return np.array(pixels, dtype=np.uint32).reshape(SCREEN_H, SCREEN_W)
 
 
 async def measure_period_ns(clk, cycles: int = 100) -> float:
@@ -117,12 +53,21 @@ async def camera_frame_on_screen(dut):
     await dvp_camera(dut, [rgb565] * 3, pclk=dut.cam_pclk_i)
     # LED3 (led_n_o[3], активный 0) — ядра загружены.
     assert int(dut.led_n_o.value) & 0b1000 == 0, "kernels are not loaded"
-    screen = await capture_screen(dut)
+    # Снимок — так, как его принимает панель: по спаду DCLK на выводах разъёма (ILI6122 при
+    # CLKPOL = L), с проверкой структуры DE и периодов.
+    screen = await capture_screen(
+        dut.lcd_clk_o,
+        dut.lcd_de_o,
+        dut.lcd_r_o,
+        dut.lcd_g_o,
+        dut.lcd_b_o,
+        SCREEN,
+        TOTAL,
+        LCD_PERIOD_NS,
+    )
 
     gray = rgb888_to_gray(rgb565_to_rgb888(rgb565))
-    expected = display_frame(
-        pipeline(gray, [KERNELS[n] for n in DEFAULT_CHAIN]), SCREEN_W, SCREEN_H, 1, BITS
-    )
+    expected = display_frame(pipeline(gray, [KERNELS[n] for n in DEFAULT_CHAIN]), *SCREEN)
     bad = np.argwhere(screen != expected)
     assert not len(bad), (
         f"{len(bad)} mismatching screen pixels, first at {tuple(int(v) for v in bad[0])}: "

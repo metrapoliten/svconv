@@ -1,32 +1,27 @@
 `timescale 1ns / 1ps
 
-// Вывод кадра SrcWidth×SrcHeight из кадрового буфера на RGB-дисплей с целочисленным
-// увеличением Scale и по центру экрана; вне картинки — чёрный цвет. Пиксель в оттенках серого
-// выводится во всех трёх цветах (R = G = B): RBits/GBits/BBits старших бит (RGB565 — 5/6/5,
-// RGB666 — 6/6/6, RGB888 — 8/8/8).
+// Вывод кадра SrcWidth×SrcHeight из кадрового буфера на RGB-дисплей по центру экрана; вне
+// картинки — чёрный цвет. Пиксель в оттенках серого выводится во всех трёх цветах (R = G = B):
+// RBits/GBits/BBits старших бит (RGB565 — 5/6/5, RGB666 — 6/6/6, RGB888 — 8/8/8).
 //
-// По координатам от video_timing вычисляется адрес в буфере: (y - OffY) / Scale * SrcWidth +
-// (x - OffX) / Scale. Деление — на константу: для степеней двойки это просто сдвиг.
-// Чтение буфера занимает такт, поэтому синхросигналы задерживаются на столько же, чтобы
-// цвет и синхросигналы на выходе относились к одному пикселю.
+// По координатам от video_timing вычисляется адрес в буфере: (y - OffY) * SrcWidth + (x - OffX).
+// Чтение буфера занимает такт, поэтому DE задерживается на столько же, чтобы цвет и DE на выходе
+// относились к одному пикселю.
 module lcd_frame_reader #(
-    parameter int unsigned HActive = 480,
-    parameter int unsigned VActive = 272,
-    parameter int unsigned HW = 10,  // разрядность x_i
-    parameter int unsigned VW = 9,  // разрядность y_i
-    parameter int unsigned SrcWidth = 160,
-    parameter int unsigned SrcHeight = 120,
-    parameter int unsigned Scale = 2,
-    parameter int unsigned RBits = 5,
+    parameter int unsigned HActive = 800,
+    parameter int unsigned VActive = 480,
+    parameter int unsigned HW = 11,  // разрядность x_i
+    parameter int unsigned VW = 10,  // разрядность y_i
+    parameter int unsigned SrcWidth = 640,
+    parameter int unsigned SrcHeight = 480,
+    parameter int unsigned RBits = 6,
     parameter int unsigned GBits = 6,
-    parameter int unsigned BBits = 5,
+    parameter int unsigned BBits = 6,
     localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight)
 ) (
     input logic clk_i,  // пиксельная частота
 
     // Выходы video_timing.
-    input logic          hsync_i,
-    input logic          vsync_i,
     input logic          de_i,
     input logic [HW-1:0] x_i,
     input logic [VW-1:0] y_i,
@@ -36,21 +31,17 @@ module lcd_frame_reader #(
     input  logic [      7:0] fb_data_i,
 
     // Выход на дисплей.
-    output logic             hsync_o,
-    output logic             vsync_o,
     output logic             de_o,
     output logic [RBits-1:0] r_o,
     output logic [GBits-1:0] g_o,
     output logic [BBits-1:0] b_o
 );
 
-  localparam int unsigned OutW = SrcWidth * Scale;
-  localparam int unsigned OutH = SrcHeight * Scale;
-  localparam int unsigned OffX = (HActive - OutW) / 2;
-  localparam int unsigned OffY = (VActive - OutH) / 2;
+  localparam int unsigned OffX = (HActive - SrcWidth) / 2;
+  localparam int unsigned OffY = (VActive - SrcHeight) / 2;
 
-  if (OutW > HActive || OutH > VActive) begin : g_check_size
-    $error("lcd_frame_reader: scaled image does not fit the display");
+  if (SrcWidth > HActive || SrcHeight > VActive) begin : g_check_size
+    $error("lcd_frame_reader: the image does not fit the display");
   end
 
   // Стадия 1: адрес чтения (комбинационно из координат) и признак «внутри картинки».
@@ -58,32 +49,27 @@ module lcd_frame_reader #(
   logic [AddrW-1:0] addr;
 
   always_comb begin
-    in_image = (int'(x_i) >= int'(OffX)) && (int'(x_i) < int'(OffX + OutW)) &&
-             (int'(y_i) >= int'(OffY)) && (int'(y_i) < int'(OffY + OutH));
+    in_image = (int'(x_i) >= int'(OffX)) && (int'(x_i) < int'(OffX + SrcWidth)) &&
+             (int'(y_i) >= int'(OffY)) && (int'(y_i) < int'(OffY + SrcHeight));
     addr = in_image ?
-        AddrW'((int'(y_i) - int'(OffY)) / int'(Scale) * int'(SrcWidth) +
-               (int'(x_i) - int'(OffX)) / int'(Scale)) : '0;
+        AddrW'((int'(y_i) - int'(OffY)) * int'(SrcWidth) + (int'(x_i) - int'(OffX))) : '0;
   end
 
   assign fb_addr_o = addr;
 
-  // Стадия 2: данные буфера готовы; синхросигналы и признак задержаны на такт.
-  logic hsync_q, vsync_q, de_q, in_image_q;
+  // Стадия 2: данные буфера готовы; DE и признак задержаны на такт.
+  logic de_q, in_image_q;
 
   always_ff @(posedge clk_i) begin
-    hsync_q    <= hsync_i;
-    vsync_q    <= vsync_i;
     de_q       <= de_i;
     in_image_q <= in_image && de_i;
   end
 
   always_ff @(posedge clk_i) begin
-    hsync_o <= hsync_q;
-    vsync_o <= vsync_q;
-    de_o    <= de_q;
-    r_o     <= in_image_q ? fb_data_i[7-:RBits] : '0;
-    g_o     <= in_image_q ? fb_data_i[7-:GBits] : '0;
-    b_o     <= in_image_q ? fb_data_i[7-:BBits] : '0;
+    de_o <= de_q;
+    r_o  <= in_image_q ? fb_data_i[7-:RBits] : '0;
+    g_o  <= in_image_q ? fb_data_i[7-:GBits] : '0;
+    b_o  <= in_image_q ? fb_data_i[7-:BBits] : '0;
   end
 
 endmodule

@@ -165,15 +165,17 @@ def test_gray_to_rgb() -> None:
     )
 
 
-def test_display_frame_scales_and_centers() -> None:
+def test_display_frame_centers() -> None:
     img = np.array([[10, 20], [30, 40]], dtype=np.uint8)
-    screen = display_frame(img, 7, 6, scale=2)
-    # Картинка 4×4 со смещением ((7-4)//2, (6-4)//2) = (1, 1).
-    assert screen.shape == (6, 7)
-    assert screen[1, 1] == screen[2, 2] == gray_to_rgb(np.array([10]))[0]
-    assert screen[1, 3] == gray_to_rgb(np.array([20]))[0]
-    assert screen[4, 4] == gray_to_rgb(np.array([40]))[0]
-    assert screen[0].sum() == 0 and screen[:, 0].sum() == 0 and screen[:, 5:].sum() == 0
+    screen = display_frame(img, 5, 4, bits=(5, 6, 5))
+    # Картинка 2×2 со смещением ((5-2)//2, (4-2)//2) = (1, 1).
+    assert screen.shape == (4, 5)
+    assert screen[1, 1] == gray_to_rgb(np.array([10]))[0]
+    assert screen[1, 2] == gray_to_rgb(np.array([20]))[0]
+    assert screen[2, 2] == gray_to_rgb(np.array([40]))[0]
+    assert screen[0].sum() == 0 and screen[:, 0].sum() == 0 and screen[:, 3:].sum() == 0
+    with pytest.raises(ValueError):
+        display_frame(img, 1, 4)
 
 
 @pytest.mark.parametrize("k", [0, -1, 4, 6])
