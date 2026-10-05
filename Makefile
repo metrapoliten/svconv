@@ -1,6 +1,10 @@
 # Проверки всего проекта.
 #
-#   make test   — тесты эталонной модели (pytest) и все тесты из tests/*/ (iverilog, cocotb)
+#   make test     — тесты модели и клиентов (pytest: model/, tools/) и тесты модулей из tests/*/
+#                   (iverilog, cocotb)
+#   make test-top — сквозные тесты верхних модулей плат (tests/*_top/): рабочие размеры кадра,
+#                   поэтому идут долго (от нескольких минут до получаса каждый); перед загрузкой
+#                   прошивки в плату
 #   make lint   — линтер verible
 #   make format — проверка форматирования verible (без изменения файлов)
 #   make formal — формальная проверка (SymbiYosys из пакета yowasp-yosys, решатель z3)
@@ -10,17 +14,21 @@ export PATH := $(CURDIR)/.venv/bin:$(PATH)
 
 # В formal/ — только исходники первого уровня (во вложенных каталогах — копии SymbiYosys).
 SV_SOURCES := $(shell find rtl boards tests -name '*.sv' 2>/dev/null) $(wildcard formal/*/*.sv)
-TEST_DIRS  := $(dir $(wildcard tests/*/Makefile))
+TOP_TEST_DIRS := $(dir $(wildcard tests/*_top/Makefile tests/*_top_*/Makefile))
+TEST_DIRS  := $(filter-out $(TOP_TEST_DIRS),$(dir $(wildcard tests/*/Makefile)))
 SBY_FILES  ?= $(wildcard formal/*/*.sby)
 # Инструменты YoWASP называются иначе, чем обычные yosys/yosys-smtbmc.
 SBY        := yowasp-sby --yosys yowasp-yosys --smtbmc yowasp-yosys-smtbmc \
               --witness yowasp-yosys-witness
 
-.PHONY: test lint format formal clean
+.PHONY: test test-top lint format formal clean
 
 test:
-	python3 -m pytest -q model
+	python3 -m pytest -q model tools
 	@set -e; for d in $(TEST_DIRS); do echo "== $$d"; $(MAKE) -s -C $$d test; done
+
+test-top:
+	@set -e; for d in $(TOP_TEST_DIRS); do echo "== $$d"; $(MAKE) -s -C $$d test; done
 
 lint:
 	verible-verilog-lint $(SV_SOURCES)
@@ -36,4 +44,4 @@ formal:
 	@set -e; for f in $(SBY_FILES); do echo "== $$f"; (cd $$(dirname $$f) && $(SBY) -f $$(basename $$f)); done
 
 clean:
-	@for d in $(TEST_DIRS); do $(MAKE) -s -C $$d clean; done
+	@for d in $(TEST_DIRS) $(TOP_TEST_DIRS); do $(MAKE) -s -C $$d clean; done
