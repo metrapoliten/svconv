@@ -254,6 +254,14 @@ def check_ov7670_setup(writes: list[tuple[int, int, int, int]]) -> None:
     assert com14 & 0x10 == 0, f"COM14 = {com14:#04x}: PCLK divider or manual scaling is on"
     clkrc = r.get(0x11, 0x80)
     assert clkrc & 0x3F == 0, f"CLKRC = {clkrc:#04x}: the clock is prescaled"
+    # Для RGB565 CLKRC записывается после настроек формата, иначе изображение хуже (драйвер Linux
+    # drivers/media/i2c/ov7670.c): COM7, COM15, TSLB, COM13.
+    order = [reg for _, _, reg, _ in writes]
+    last_clkrc = max(i for i, reg in enumerate(order) if reg == 0x11)
+    for reg in (0x12, 0x40, 0x3A, 0x3D):
+        if reg in order:
+            last = max(i for i, x in enumerate(order) if x == reg)
+            assert last < last_clkrc, f"CLKRC is not written again after register {reg:#04x}"
     assert r.get(0x6B, 0x0A) & 0xC0 == 0, "DBLV: the PLL multiplies the clock"
     href, vref = r.get(0x32, 0x80), r.get(0x03, 0x00)
     hstart = r[0x17] << 3 | href & 7
@@ -270,13 +278,13 @@ def _line(sig) -> int:
     return 0 if str(sig.value) == "0" else 1
 
 
-async def ov7670_power_up(dut, clk, timeout_ms: int = 100) -> None:
+async def ov7670_power_up(dut, clk, timeout_ms: int = 200) -> None:
     """Запуск камеры в тестах верхних модулей (порты cam_rst_n_o, cam_pwdn_o, cam_scl_io,
     cam_sda_io; led_n_o[1] = 0 — «камера настроена»). Ждёт аппаратного сброса камеры (RESET# = 0,
     затем 1) при PWDN = 0, декодирует настройку по SCCB (такт clk) до сигнала «камера настроена» и
     проверяет итоговые регистры. Модель камеры выдаёт кадры только после этого — как настоящая,
     которой нужны сброс и настройка. Дальше RESET# и PWDN не должны меняться. Весь запуск — не
-    дольше timeout_ms (у ov7670_init — около 45 мс)."""
+    дольше timeout_ms (у ov7670_init при SCCB 25 кГц — около 115 мс)."""
     await with_timeout(_power_up(dut, clk), timeout_ms, "ms")
     cocotb.start_soon(_camera_stays_on(dut))
 

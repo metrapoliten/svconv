@@ -183,9 +183,12 @@ module camera_lcd_top (
 
   logic sioc_oe, siod_oe, cam_ready;
 
+  // SCCB — 25 кГц: SIOC/SIOD подтянуты только внутренней подтяжкой ПЛИС (~100 мкА, около
+  // 33 кОм), и на проводах фронт нарастает микросекунды; при 25 кГц SIOC держится высоким 20 мкс.
+  // Нижнего предела частоты у SCCB нет; настройка камеры длится ~115 мс вместо ~45.
   ov7670_init #(
       .ClkFreq (ClkFreq),
-      .SccbFreq(100_000)
+      .SccbFreq(25_000)
   ) u_cam_init (
       .clk_i      (clk50_i),
       .rst_i      (rst),

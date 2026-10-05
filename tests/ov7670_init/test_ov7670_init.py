@@ -52,7 +52,7 @@ async def writes_whole_table(dut):
     await ClockCycles(dut.clk_i, 10)
 
     got = [(dev, reg, val) for _, dev, reg, val in monitor.writes]
-    assert len(TABLE) == 78
+    assert len(TABLE) == 79
     assert got == [(0x42, reg, val) for reg, val in TABLE], "SCCB writes differ from the table"
     # Первая запись — программный сброс, после неё пауза не меньше 10 мс.
     assert TABLE[0] == (0x12, 0x80)

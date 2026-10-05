@@ -9,11 +9,16 @@
 //
 // Таблица регистров (режим VGA 640×480, RGB565) взята из проекта Angelo Jacobo
 // https://github.com/AngeloJacobo/FPGA_OV7670_Camera_Interface (src/camera_interface.v),
-// лицензия MIT, Copyright (c) 2021 Angelo Jacobo; автор, в свою очередь, ссылается на
-// https://github.com/jonlwowski012/OV7670_NEXYS4_Verilog. Комментарии к записям — оригинальные.
-// Одно изменение: COM10 = 0x00 (PCLK идёт непрерывно) вместо 0x20 (PCLK стоит в гашении,
-// при HREF = 0). В оригинале PCLK лишь выбирается быстрым системным тактом, а у нас это
-// тактовый сигнал домена захвата: без него dvp_capture не увидел бы ни VSYNC, ни конца строки.
+// лицензия MIT, Copyright (c) 2021 Angelo Jacobo. Автор ссылается на
+// https://github.com/jonlwowski012/OV7670_NEXYS4_Verilog, но значения и комментарии записей
+// совпадают с https://github.com/westonb/OV7670-Verilog (курс MIT 6.111) — комментарии оттуда.
+// Изменения:
+//   - COM10 = 0x00 (PCLK идёт непрерывно) вместо 0x20 (PCLK стоит в гашении, при HREF = 0).
+//     У Angelo PCLK лишь выбирается быстрым системным тактом, а у нас это тактовый сигнал
+//     домена захвата: без него dvp_capture не увидел бы ни VSYNC, ни конца строки;
+//   - в конце CLKRC записан ещё раз: для RGB565 его нужно записывать после остальных
+//     настроек формата, иначе изображение хуже (драйвер Linux drivers/media/i2c/ov7670.c;
+//     так же у Mike Field, от которого идут FPGA-таблицы для OV7670).
 module ov7670_init #(
     parameter int unsigned ClkFreq  = 27_000_000,  // частота clk_i, Гц
     parameter int unsigned SccbFreq = 100_000
@@ -28,7 +33,7 @@ module ov7670_init #(
     output logic done_o
 );
 
-  localparam int unsigned NumRegs = 78;
+  localparam int unsigned NumRegs = 79;
   localparam int unsigned Ms = ClkFreq / 1000;
   localparam int unsigned ResetClks = Ms;  // RESET# = 0
   localparam int unsigned WaitClks = 10 * Ms;  // пауза после сброса
@@ -118,6 +123,7 @@ module ov7670_init #(
       7'd75: ov7670_reg = 16'h13_E5;  // COM8, enable AGC / AEC
       7'd76: ov7670_reg = 16'h1E_23;  // Mirror Image
       7'd77: ov7670_reg = 16'h69_06;  // gain of RGB(manually adjusted)
+      7'd78: ov7670_reg = 16'h11_80;  // CLKRC again, after the format (see header)
       default: ov7670_reg = 16'hFF_FF;
     endcase
   endfunction
