@@ -4,7 +4,7 @@ mode prove
 depth 48
 
 [engines]
-smtbmc z3
+smtbmc yices
 
 [script]
 read_verilog -sv -formal uart_tx.sv

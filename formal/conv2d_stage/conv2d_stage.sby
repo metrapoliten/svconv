@@ -11,7 +11,7 @@ gaps: depth 10
 continuous: depth 40
 
 [engines]
-smtbmc z3
+smtbmc yices
 
 [script]
 read_verilog -sv -formal sdp_ram.sv conv_postprocess.sv conv2d_stage.sv

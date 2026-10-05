@@ -5,7 +5,7 @@ mode prove
 depth 80
 
 [engines]
-smtbmc z3
+smtbmc yices
 
 [script]
 read_verilog -sv -formal video_timing.sv

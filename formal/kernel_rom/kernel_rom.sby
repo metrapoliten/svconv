@@ -7,7 +7,7 @@ mode prove
 depth 64
 
 [engines]
-smtbmc z3
+smtbmc yices
 
 [script]
 # -defer: модуль собирается с параметрами из обёртки (InitFile = rom.hex), а не по умолчанию.

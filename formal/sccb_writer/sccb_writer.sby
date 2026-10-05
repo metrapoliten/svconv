@@ -7,7 +7,7 @@ mode prove
 depth 150
 
 [engines]
-smtbmc z3
+smtbmc yices
 
 [script]
 read_verilog -sv -formal sccb_writer.sv

@@ -7,7 +7,7 @@
 #                   прошивки в плату
 #   make lint   — линтер verible
 #   make format — проверка форматирования verible (без изменения файлов)
-#   make formal — формальная проверка (SymbiYosys, решатель z3): нативный из OSS CAD Suite, если
+#   make formal — формальная проверка (SymbiYosys, решатель yices): нативный из OSS CAD Suite, если
 #                 задана переменная окружения OSS_CAD_SUITE (каталог распаковки, примерно вдвое
 #                 быстрее), иначе — из пакета yowasp-yosys (requirements.txt)
 
@@ -19,10 +19,10 @@ SV_SOURCES := $(shell find rtl boards tests -name '*.sv' 2>/dev/null) $(wildcard
 TOP_TEST_DIRS := $(dir $(wildcard tests/*_top/Makefile tests/*_top_*/Makefile))
 TEST_DIRS  := $(filter-out $(TOP_TEST_DIRS),$(dir $(wildcard tests/*/Makefile)))
 SBY_FILES  ?= $(wildcard formal/*/*.sby)
-# Обёртки в $(OSS_CAD_SUITE)/bin сами находят остальные программы набора (yosys, z3); в PATH
+# Обёртки в $(OSS_CAD_SUITE)/bin сами находят остальные программы набора (yosys, yices); в PATH
 # набор не добавляется, чтобы не подменять системные iverilog и другие.
 ifneq ($(OSS_CAD_SUITE),)
-SBY        ?= $(OSS_CAD_SUITE)/bin/sby
+SBY        ?= "$(OSS_CAD_SUITE)/bin/sby"
 else
 # Инструменты YoWASP называются иначе, чем обычные yosys/yosys-smtbmc.
 SBY        ?= yowasp-sby --yosys yowasp-yosys --smtbmc yowasp-yosys-smtbmc \
@@ -45,7 +45,8 @@ lint:
 format:
 	@set -e; for f in $(SV_SOURCES); do verible-verilog-format --verify $$f; done
 
-# Доказательства идут от секунд до десятков минут (дольше всех — uart_rx); одно можно запустить
+# Доказательства идут от секунд до ~3 минут (дольше всех — uart_rx), все вместе — около 5 минут;
+# одно можно запустить
 # так: make formal SBY_FILES=formal/uart_tx/uart_tx.sby
 formal:
 	python3 model/gen_hex.py random --count 78 --seed 1 -o formal/kernel_rom/rom.hex
