@@ -28,8 +28,8 @@
 //   6) постобработка: модуль, округление, сдвиг, насыщение, обнуление краёв.
 // Признаки valid/sof/«край» проходят через сдвиговые регистры той же длины, что и данные.
 module conv2d_stage #(
-    parameter int unsigned Width  = 160,
-    parameter int unsigned Height = 120,
+    parameter int unsigned Width,
+    parameter int unsigned Height,
     parameter int unsigned K      = 5
 ) (
     input logic clk_i,

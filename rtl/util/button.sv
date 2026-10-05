@@ -3,7 +3,7 @@
 // Кнопка: синхронизация асинхронного входа, подавление дребезга и импульс на нажатие.
 // Состояние кнопки меняется, только если вход не менялся StableClks тактов подряд.
 module button #(
-    parameter int unsigned StableClks = 270_000,  // 10 мс при 27 МГц
+    parameter int unsigned StableClks,  // столько тактов вход должен не меняться (10 мс — обычно)
     parameter bit ActiveLow = 1'b1  // 1 — нажатая кнопка замыкает вход на землю
 ) (
     input logic clk_i,

@@ -9,10 +9,10 @@
 // x_o, y_o — координаты текущего пикселя внутри видимой области (имеют смысл при de_o = 1).
 // Все выходы регистровые и относятся к одному и тому же пикселю.
 module video_timing #(
-    parameter int unsigned HActive = 800,
-    parameter int unsigned HBlank = 392,
-    parameter int unsigned VActive = 480,
-    parameter int unsigned VBlank = 53,
+    parameter int unsigned HActive,
+    parameter int unsigned HBlank,
+    parameter int unsigned VActive,
+    parameter int unsigned VBlank,
     localparam int unsigned HTotal = HActive + HBlank,
     localparam int unsigned VTotal = VActive + VBlank,
     localparam int unsigned HW = $clog2(HTotal),

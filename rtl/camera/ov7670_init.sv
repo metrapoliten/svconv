@@ -27,7 +27,7 @@
 //   - REG76 = 0xE1: исправление «горячих» и «мёртвых» пикселей сенсора (даташит v1.4: биты 7 и
 //     6; значение — из драйвера Linux).
 module ov7670_init #(
-    parameter int unsigned ClkFreq  = 27_000_000,  // частота clk_i, Гц
+    parameter int unsigned ClkFreq,  // частота clk_i, Гц
     parameter int unsigned SccbFreq = 100_000
 ) (
     input logic clk_i,

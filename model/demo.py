@@ -1,6 +1,6 @@
 """Демонстрация модели на настоящем изображении.
 
-    python3 model/demo.py photo.jpg out/ --size 160x120 --chain gauss5,gauss5,log5
+    python3 model/demo.py photo.jpg out/ --size 640x480 --chain gauss5,gauss5,log5
 
 Сохраняет в out/: 00_gray.png и по файлу на каждый каскад цепочки.
 """
@@ -18,7 +18,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Apply a kernel chain of the model to an image.")
     parser.add_argument("image", type=Path)
     parser.add_argument("out_dir", type=Path)
-    parser.add_argument("--size", default="160x120", help="processing width x height")
+    parser.add_argument("--size", default="640x480", help="processing width x height")
     parser.add_argument(
         "--chain",
         default="gauss5,gauss5,log5",

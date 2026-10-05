@@ -8,8 +8,8 @@
 // на экране возможен «разрыв» кадра. Адрес записи отсчитывается от sof, поэтому сбой в потоке
 // исправляется со следующего кадра.
 module frame_buffer #(
-    parameter  int unsigned Width  = 160,
-    parameter  int unsigned Height = 120,
+    parameter  int unsigned Width,
+    parameter  int unsigned Height,
     localparam int unsigned Pixels = Width * Height,
     localparam int unsigned AddrW  = $clog2(Pixels)
 ) (

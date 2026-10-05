@@ -8,12 +8,12 @@
 // Чтение буфера занимает такт, поэтому DE задерживается на столько же, чтобы цвет и DE на выходе
 // относились к одному пикселю.
 module lcd_frame_reader #(
-    parameter int unsigned HActive = 800,
-    parameter int unsigned VActive = 480,
-    parameter int unsigned HW = 11,  // разрядность x_i
-    parameter int unsigned VW = 10,  // разрядность y_i
-    parameter int unsigned SrcWidth = 640,
-    parameter int unsigned SrcHeight = 480,
+    parameter int unsigned HActive,
+    parameter int unsigned VActive,
+    parameter int unsigned HW,  // разрядность x_i
+    parameter int unsigned VW,  // разрядность y_i
+    parameter int unsigned SrcWidth,
+    parameter int unsigned SrcHeight,
     localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight)
 ) (
     input logic clk_i,  // пиксельная частота

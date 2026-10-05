@@ -4,12 +4,12 @@
 // кадра с центрированием (lcd_frame_reader). Работает на пиксельной частоте дисплея.
 // Тайминги — из документации на дисплей; для SH500Q01Z — в boards/mega138k/camera_lcd_top.sv.
 module lcd_output #(
-    parameter int unsigned HActive = 800,
-    parameter int unsigned HBlank = 392,
-    parameter int unsigned VActive = 480,
-    parameter int unsigned VBlank = 53,
-    parameter int unsigned SrcWidth = 640,
-    parameter int unsigned SrcHeight = 480,
+    parameter int unsigned HActive,
+    parameter int unsigned HBlank,
+    parameter int unsigned VActive,
+    parameter int unsigned VBlank,
+    parameter int unsigned SrcWidth,
+    parameter int unsigned SrcHeight,
     localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight)
 ) (
     input logic clk_i,  // пиксельная частота

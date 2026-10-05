@@ -7,7 +7,7 @@
 // используется. Без этого синтезатор делает однопортовую память в режиме «чтение перед
 // записью», которого нет в BSRAM GW5A (Mega 138K).
 module sdp_ram #(
-    parameter int unsigned Depth = 160,
+    parameter int unsigned Depth,
     parameter int unsigned DataW = 8
 ) (
     input  logic                     clk_i,

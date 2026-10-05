@@ -6,8 +6,8 @@
 //
 // Кадр камеры Width×Height (RGB565) переводится в оттенки серого и проходит цепочку свёрток.
 module camera_pipeline #(
-    parameter int unsigned Width = 160,
-    parameter int unsigned Height = 120,
+    parameter int unsigned Width,
+    parameter int unsigned Height,
     parameter int unsigned K = 5,
     parameter int unsigned NumStages = 3,
     parameter int unsigned NumKernels = 3,

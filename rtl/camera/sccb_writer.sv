@@ -10,7 +10,7 @@
 //
 // Запись начинается по start_i при ready_o = 1 и занимает около 30 периодов SCCB.
 module sccb_writer #(
-    parameter int unsigned ClkFreq = 27_000_000,  // частота clk_i, Гц
+    parameter int unsigned ClkFreq,  // частота clk_i, Гц
     parameter int unsigned SccbFreq = 100_000  // частота SIOC, Гц (OV7670 допускает до 400 кГц)
 ) (
     input logic clk_i,

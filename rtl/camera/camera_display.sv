@@ -10,8 +10,8 @@
 // редко (см. conv_pipeline). На дисплей выходит уровень серого RGB666 (см. lcd_frame_reader).
 module camera_display #(
     // Обработка.
-    parameter int unsigned Width = 160,
-    parameter int unsigned Height = 120,
+    parameter int unsigned Width,
+    parameter int unsigned Height,
     parameter int unsigned K = 5,
     parameter int unsigned NumStages = 3,
     parameter int unsigned NumKernels = 3,
@@ -19,10 +19,10 @@ module camera_display #(
     // verilog_lint: waive explicit-parameter-storage-type
     parameter KernelFile = "kernels.hex",
     // Дисплей (режим DE, см. video_timing).
-    parameter int unsigned HActive = 800,
-    parameter int unsigned HBlank = 392,
-    parameter int unsigned VActive = 480,
-    parameter int unsigned VBlank = 53,
+    parameter int unsigned HActive,
+    parameter int unsigned HBlank,
+    parameter int unsigned VActive,
+    parameter int unsigned VBlank,
     // Разрядность номера ядра — определяется числом ядер.
     localparam int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
 ) (
