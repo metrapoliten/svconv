@@ -130,8 +130,9 @@ async def clean_frame_after_reconfiguration(dut):
         np_rng.integers(0, 256, (HEIGHT, WIDTH), dtype=np.uint8) for _ in range(5 * num_changes + 6)
     ]
 
-    # Выход с номером такта: (такт, sof, данные).
+    # Выход с номером такта: (такт, sof, данные); начала входных кадров: (такт, номер кадра).
     out: list[tuple[int, int, int]] = []
+    in_sofs: list[tuple[int, int]] = []
     cycle = 0
 
     async def monitor() -> None:
@@ -142,12 +143,29 @@ async def clean_frame_after_reconfiguration(dut):
             if dut.valid_o.value == 1:
                 out.append((cycle, int(dut.sof_o.value), int(dut.data_o.value)))
 
+    async def feed() -> None:
+        """Как drive(), но запоминает, когда начался каждый входной кадр."""
+        for idx, frame in enumerate(frames):
+            for pos, pixel in enumerate(frame.flatten()):
+                while rng.random() < 0.1:
+                    dut.valid_i.value = 0
+                    await RisingEdge(dut.clk_i)
+                dut.valid_i.value = 1
+                dut.sof_i.value = int(pos == 0)
+                dut.data_i.value = int(pixel)
+                await RisingEdge(dut.clk_i)
+                if pos == 0:
+                    in_sofs.append((cycle, idx))
+        dut.valid_i.value = 0
+        dut.sof_i.value = 0
+
     cocotb.start_soon(monitor())
-    cocotb.start_soon(drive(dut, frames, 0.1, rng))
+    cocotb.start_soon(feed())
     frame_cycles = WIDTH * HEIGHT
 
     for n in range(num_changes):
-        cfg = configs[1 + n % (len(configs) - 1)] if n % 2 == 0 else configs[0]
+        # Конфигурации по кругу, начиная со второй: соседние всегда различаются.
+        cfg = configs[(n + 1) % len(configs)]
         # Смена в разные моменты кадра: от его начала до конца с шагом 1/num_changes.
         await ClockCycles(dut.clk_i, 3 * frame_cycles + n * frame_cycles // num_changes)
         apply(cfg)
@@ -163,8 +181,10 @@ async def clean_frame_after_reconfiguration(dut):
             await RisingEdge(dut.clk_i)
         got = np.array([d for _, _, d in out[starts[1] : starts[1] + WIDTH * HEIGHT]], dtype=np.uint8)
         got = got.reshape(HEIGHT, WIDTH)
+        # Выход отстаёт от входа меньше чем на кадр (HEIGHT > NUM_STAGES * (p + 1)), поэтому
+        # выходной кадр — результат входного кадра, который подавался в момент его sof_o.
+        sof_cycle = out[starts[1]][0]
+        src = max(idx for c, idx in in_sofs if c <= sof_cycle)
         kernels, enabled = cfg
-        chain = [pad_kernel(KERNELS[n], K) for n, e in zip(kernels, enabled) if e]
-        assert any((got == pipeline(f, chain)).all() for f in frames), (
-            f"{cfg}: second frame after ready_o does not match any input frame"
-        )
+        chain = [pad_kernel(KERNELS[name], K) for name, e in zip(kernels, enabled) if e]
+        assert_frames_equal(got, pipeline(frames[src], chain), f"change {n} {cfg}, input frame {src}")
