@@ -290,7 +290,6 @@ module camera_lcd_top #(
   camera_display #(
       .Width     (CamWidth),
       .Height    (CamHeight),
-      .Factor    (1),
       .K         (5),
       .NumStages (3),
       .NumKernels(3),

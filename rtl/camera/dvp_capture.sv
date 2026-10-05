@@ -8,8 +8,8 @@
 // PCLK должен идти непрерывно, в том числе при HREF = 0 и VSYNC = 1 (у OV7670 — COM10[5] = 0):
 // иначе модуль не увидит ни VSYNC, ни паузы между строками.
 //
-// Выход — поток пикселей RGB565: valid_o, sof_o у первого пикселя кадра, sol_o у первого
-// пикселя каждой строки. Задержка — 2 такта PCLK (входные регистры и сборка пикселя).
+// Выход — поток пикселей RGB565: valid_o, sof_o у первого пикселя кадра. Задержка — 2 такта
+// PCLK (входные регистры и сборка пикселя).
 module dvp_capture (
     input logic pclk_i,
     input logic rst_i,  // синхронный сброс в домене PCLK, активный уровень 1
@@ -20,7 +20,6 @@ module dvp_capture (
 
     output logic        valid_o,
     output logic        sof_o,
-    output logic        sol_o,
     output logic [15:0] data_o
 );
 
@@ -36,22 +35,18 @@ module dvp_capture (
 
   logic       second_byte_q;  // ждём второй байт пикселя
   logic       frame_start_q;  // следующий пиксель — первый в кадре
-  logic       line_start_q;  // следующий пиксель — первый в строке
   logic [7:0] high_byte_q;
 
   always_ff @(posedge pclk_i) begin
     if (rst_i) begin
       second_byte_q <= 1'b0;
       frame_start_q <= 1'b0;
-      line_start_q  <= 1'b1;
       valid_o       <= 1'b0;
       sof_o         <= 1'b0;
-      sol_o         <= 1'b0;
     end else begin
       valid_o <= 1'b0;
       if (vsync_q) begin
         frame_start_q <= 1'b1;
-        line_start_q  <= 1'b1;
         second_byte_q <= 1'b0;
       end else if (href_q) begin
         if (!second_byte_q) begin
@@ -60,14 +55,11 @@ module dvp_capture (
         end else begin
           valid_o       <= 1'b1;
           sof_o         <= frame_start_q;
-          sol_o         <= line_start_q;
           data_o        <= {high_byte_q, data_q};
           frame_start_q <= 1'b0;
-          line_start_q  <= 1'b0;
           second_byte_q <= 1'b0;
         end
       end else begin
-        line_start_q  <= 1'b1;
         second_byte_q <= 1'b0;
       end
     end

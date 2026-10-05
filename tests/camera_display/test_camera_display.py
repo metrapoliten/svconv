@@ -1,5 +1,5 @@
 """Сквозной тест camera_display: кадр с модели камеры DVP появляется на экране LCD так, как
-предсказывает модель (прореживание -> серый -> цепочка свёрток -> увеличение и центрирование).
+предсказывает модель (серый -> цепочка свёрток -> увеличение и центрирование).
 Размеры совпадают с параметрами в Makefile."""
 
 import os
@@ -12,7 +12,6 @@ from cocotb.triggers import ClockCycles, FallingEdge, RisingEdge
 from svconv_model import (
     KERNEL_ROM_ORDER,
     KERNELS,
-    decimate,
     display_frame,
     pad_kernel,
     pipeline,
@@ -22,8 +21,7 @@ from svconv_model import (
 from svconv_tb import dvp_camera
 
 K = int(os.environ["K"])
-CAM_W, CAM_H, FACTOR = 16, 12, 1
-W, H = 16, 12
+CAM_W, CAM_H = 16, 12
 SCREEN_W, SCREEN_H, SCALE = 40, 30, 1
 BITS = (6, 6, 6)  # RGB666, как в Makefile
 SEL_W = max(1, (len(KERNEL_ROM_ORDER) - 1).bit_length())
@@ -73,7 +71,7 @@ async def run(dut, kernels: list[str], enabled: list[bool], seed: int) -> None:
     await dvp_camera(dut, [rgb565] * 4)
     screen = await capture_screen(dut)
 
-    gray = rgb888_to_gray(rgb565_to_rgb888(decimate(rgb565, FACTOR, W, H)))
+    gray = rgb888_to_gray(rgb565_to_rgb888(rgb565))
     chain = [pad_kernel(KERNELS[n], K) for n, e in zip(kernels, enabled) if e]
     expected = display_frame(pipeline(gray, chain), SCREEN_W, SCREEN_H, SCALE, BITS)
     bad = np.argwhere(screen != expected)
@@ -92,5 +90,5 @@ async def blur_blur_edges(dut):
 
 @cocotb.test()
 async def all_bypassed(dut):
-    """Без свёрток: на экране прореженный серый кадр камеры."""
+    """Без свёрток: на экране серый кадр камеры."""
     await run(dut, ["identity"] * 3, [False] * 3, seed=2)

@@ -2,7 +2,7 @@
 
 // Обработка видео с камеры и вывод на RGB-LCD (не зависит от платы):
 //
-//   домен PCLK камеры:  camera_pipeline (захват, прореживание, серый, свёртки)
+//   домен PCLK камеры:  camera_pipeline (захват, серый, свёртки)
 //                       -> запись в frame_buffer
 //   домен пикселей LCD: lcd_output читает frame_buffer
 //
@@ -12,7 +12,6 @@ module camera_display #(
     // Обработка.
     parameter int unsigned Width = 160,
     parameter int unsigned Height = 120,
-    parameter int unsigned Factor = 4,
     parameter int unsigned K = 5,
     parameter int unsigned NumStages = 3,
     parameter int unsigned NumKernels = 3,
@@ -68,7 +67,6 @@ module camera_display #(
   camera_pipeline #(
       .Width     (Width),
       .Height    (Height),
-      .Factor    (Factor),
       .K         (K),
       .NumStages (NumStages),
       .NumKernels(NumKernels),
@@ -83,9 +81,6 @@ module camera_display #(
       .stage_en_i  (stage_en_i),
       .kernel_sel_i(kernel_sel_i),
       .ready_o     (ready_o),
-      .gray_valid_o(),
-      .gray_sof_o  (),
-      .gray_data_o (),
       .out_valid_o (pipe_valid),
       .out_sof_o   (pipe_sof),
       .out_data_o  (pipe_data)
