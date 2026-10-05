@@ -26,8 +26,9 @@ module sccb_writer #(
     output logic siod_oe_o
 );
 
-  // Период SCCB делится на 4 четверти: SIOC низкий в четвертях 0-1 и высокий в 2-3;
-  // данные меняются в начале четверти 0, когда SIOC низкий.
+  // Период SCCB делится на 4 четверти; линии переключаются по концу четверти (tick). Внутри
+  // бита SIOC низкий в четвертях 0-1 и высокий в 2-3; SIOD меняется на границе четвертей 0 и 1 —
+  // в середине низкого уровня SIOC.
   localparam int unsigned QuarterClks = ClkFreq / (4 * SccbFreq);
   localparam int unsigned QW = (QuarterClks <= 1) ? 1 : $clog2(QuarterClks);
   localparam int unsigned NumBits = 27;  // 3 байта по 9 бит
@@ -71,7 +72,7 @@ module sccb_writer #(
             state_q <= Start;
           end
         end
-        // Старт: SIOD падает при высоком SIOC (четверть 1), затем SIOC опускается (четверть 3).
+        // Старт: SIOD падает при высоком SIOC (конец четверти 1), затем SIOC опускается (конец 3).
         Start: begin
           if (tick) begin
             quarter_q <= quarter_q + 1'b1;
@@ -87,8 +88,8 @@ module sccb_writer #(
           if (tick) begin
             quarter_q <= quarter_q + 1'b1;
             unique case (quarter_q)
-              // Четверть 0: выставить бит, пока SIOC низкий; 1: SIOC вверх — камера читает бит;
-              // 3: SIOC вниз, переход к следующему биту.
+              // Конец четверти 0: выставить бит, пока SIOC низкий; конец 1: SIOC вверх — камера
+              // читает бит; конец 3: SIOC вниз, переход к следующему биту.
               2'd0:    siod_oe_o <= ~shift_q[NumBits-1];
               2'd1:    sioc_oe_o <= 1'b0;
               2'd2:    ;
