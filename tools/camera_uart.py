@@ -47,6 +47,18 @@ def parse_chain(text: str) -> tuple[list[str], list[bool]]:
     return kernels, enabled
 
 
+def check(out: np.ndarray, expected: np.ndarray, period: int) -> list[str]:
+    """Сверяет результат с моделью, применённой к серому кадру с платы; возвращает список
+    расхождений (пустой — всё верно). Период кадров камеры известен, раз кадр захвачен."""
+    problems = []
+    mismatches = int((out != expected).sum())
+    if mismatches:
+        problems.append(f"{mismatches} of {out.size} result pixels differ from the model")
+    if period == 0:
+        problems.append("camera frame period is 0 although a frame was captured")
+    return problems
+
+
 def read_exact(port: serial.Serial, count: int) -> bytes:
     data = port.read(count)
     if len(data) != count:
@@ -78,8 +90,6 @@ def main() -> None:
     # Два кадра по 19200 байт на 115200 бод идут ~3,4 с; ждём с запасом.
     with serial.Serial(args.port, args.baud, timeout=10) as port:
         resync(port)
-        port.write(b"p")
-        period = int.from_bytes(read_exact(port, 4), "little")
         port.write(bytes([ord("c"), en, sel]))
         start = time.monotonic()
         port.write(b"f")
@@ -90,27 +100,32 @@ def main() -> None:
                 f"timeout: received {len(data)} bytes; is the camera running (LED4 blinking)?"
             )
         elapsed = time.monotonic() - start
+        # Период — после захвата: к этому времени камера выдала не меньше двух кадров.
+        port.write(b"p")
+        period = int.from_bytes(read_exact(port, 4), "little")
 
     raw = np.frombuffer(data[: WIDTH * HEIGHT], dtype=np.uint8).reshape(HEIGHT, WIDTH)
     out = np.frombuffer(data[WIDTH * HEIGHT :], dtype=np.uint8).reshape(HEIGHT, WIDTH)
     chain = [pad_kernel(KERNELS[n], K) for n, e in zip(kernels, enabled) if e]
     expected = pipeline(raw, chain)
-    mismatches = int((out != expected).sum())
+    problems = check(out, expected, period)
 
     print(f"chain: {args.chain}")
     if period:
         print(f"camera frame period: {period} cycles of 27 MHz ({CLK_FREQ / period:.2f} fps)")
-    else:
-        print("camera frame period: unknown (no frames from the camera yet)")
     print(f"frames received in {elapsed:.2f} s")
-    print(f"mismatches of the result with the model: {mismatches} of {WIDTH * HEIGHT}")
+    print(f"mismatches of the result with the model: {int((out != expected).sum())} of {out.size}")
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
         save(raw, args.out / "camera_gray.png")
         save(out, args.out / "result.png")
         save(expected, args.out / "expected.png")
         print(f"images saved to {args.out}")
-    sys.exit(0 if mismatches == 0 else 1)
+    for problem in problems:
+        print(f"FAIL: {problem}")
+    if not problems:
+        print("PASS")
+    sys.exit(1 if problems else 0)
 
 
 if __name__ == "__main__":
