@@ -2,7 +2,10 @@
 свёрток для этого же кадра, сохраняет их картинками и сверяет результат с моделью.
 
     python3 tools/camera_uart.py /dev/ttyUSB1 --chain gauss5,gauss5,log5 --out out/
-    python3 tools/camera_uart.py /dev/ttyUSB1 --chain -,-,- --out out/   # без обработки
+    python3 tools/camera_uart.py /dev/ttyUSB1 --chain=-,-,- --out out/   # без обработки
+
+Значение, начинающееся с '-', передаётся через '=' (--chain=-,...), иначе argparse принимает
+его за ключ.
 
 Протокол — см. rtl/bench/camera_uart.sv.
 """
@@ -61,7 +64,9 @@ def main() -> None:
     parser.add_argument("port", help="serial port of the BL702 debugger, e.g. /dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=115_200)
     parser.add_argument(
-        "--chain", default="gauss5,gauss5,log5", help="kernels of the 3 stages, '-' = bypass"
+        "--chain",
+        default="gauss5,gauss5,log5",
+        help="kernels of the 3 stages, '-' = bypass (use --chain=-,... if it starts with '-')",
     )
     parser.add_argument("--out", type=Path, help="directory to save images")
     args = parser.parse_args()
