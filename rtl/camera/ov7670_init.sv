@@ -21,7 +21,11 @@
 //     так же у Mike Field, от которого идут FPGA-таблицы для OV7670);
 //   - COM2 = 0x00: выходы камеры с наименьшей силой (1x вместо 2x по умолчанию; даташит v1.4,
 //     COM2[1:0] «increase IOL/IOH drive current»). Камера подключена проводами с одной землёй:
-//     мягкие фронты данных и PCLK меньше раскачивают землю и меньше наводят на HREF/VSYNC.
+//     мягкие фронты данных и PCLK меньше раскачивают землю и меньше наводят на HREF/VSYNC;
+//   - MVFP = 0x07 вместо 0x23: без зеркального отражения (значение драйвера Linux
+//     drivers/media/i2c/ov7670.c: «black sun» включён, зарезервированные биты — как там);
+//   - REG76 = 0xE1: исправление «горячих» и «мёртвых» пикселей сенсора (даташит v1.4: биты 7 и
+//     6; значение — из драйвера Linux).
 module ov7670_init #(
     parameter int unsigned ClkFreq  = 27_000_000,  // частота clk_i, Гц
     parameter int unsigned SccbFreq = 100_000
@@ -36,7 +40,7 @@ module ov7670_init #(
     output logic done_o
 );
 
-  localparam int unsigned NumRegs = 80;
+  localparam int unsigned NumRegs = 81;
   localparam int unsigned Ms = ClkFreq / 1000;
   localparam int unsigned ResetClks = Ms;  // RESET# = 0
   localparam int unsigned WaitClks = 10 * Ms;  // пауза после сброса
@@ -124,10 +128,11 @@ module ov7670_init #(
       7'd73: ov7670_reg = 16'hA9_90;  // HAECC6
       7'd74: ov7670_reg = 16'hAA_94;  // HAECC7
       7'd75: ov7670_reg = 16'h13_E5;  // COM8, enable AGC / AEC
-      7'd76: ov7670_reg = 16'h1E_23;  // Mirror Image
+      7'd76: ov7670_reg = 16'h1E_07;  // MVFP: no mirror, black sun on (see header)
       7'd77: ov7670_reg = 16'h69_06;  // gain of RGB(manually adjusted)
       7'd78: ov7670_reg = 16'h09_00;  // COM2: output drive 1x (see header)
-      7'd79: ov7670_reg = 16'h11_80;  // CLKRC again, after the format (see header)
+      7'd79: ov7670_reg = 16'h76_E1;  // REG76: white/black pixel correction (see header)
+      7'd80: ov7670_reg = 16'h11_80;  // CLKRC again, after the format (see header)
       default: ov7670_reg = 16'hFF_FF;
     endcase
   endfunction
