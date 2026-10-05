@@ -23,7 +23,8 @@
 // ожидание кадра (например, 'x'), и выжидает тишину на линии дольше этого времени.
 //
 // Домены: clk_i — UART и команды; pclk_i — камера и обработка. Кадры переходят между доменами
-// через двухтактовые кадровые буферы, события — через pulse_sync, настройки — через level_sync.
+// через двухтактовые кадровые буферы, запрос кадра — рукопожатием уровнями (см. ниже), начало
+// кадра камеры — через pulse_sync, настройки — через level_sync.
 module camera_uart #(
     parameter int unsigned Width = 160,
     parameter int unsigned Height = 120,
@@ -72,11 +73,13 @@ module camera_uart #(
   // =========================================================================================
   logic [NumStages-1:0] stage_en_q;
   logic [NumStages*SelW-1:0] kernel_sel_q;
-  logic arm_q;  // импульс: запрос кадра
-  logic cancel_q;  // импульс: отмена запроса кадра
-  // События из домена PCLK (импульсы в домене PCLK — ниже), пересчитанные в домен clk_i.
-  logic done_pulse;  // кадр захвачен
-  logic frame_pulse;  // начало кадра камеры
+  // Запрос кадра — рукопожатие в четыре фазы уровнями, а не импульсами: req_q = 1 — нужен кадр,
+  // served = 1 — кадр захвачен; каждый уровень меняется, только когда другой домен увидел
+  // предыдущее значение. Остановленный PCLK (камера не работает) ничего не теряет: домен PCLK
+  // видит последнее состояние запроса, когда такты возобновятся.
+  logic req_q;
+  logic served;  // served_q домена PCLK, пересчитанный в домен clk_i
+  logic frame_pulse;  // начало кадра камеры (импульс из домена PCLK)
 
   // Период кадров камеры в тактах clk_i.
   logic [31:0] period_cnt_q, period_q;
@@ -157,8 +160,7 @@ module camera_uart #(
       state_q          <= Idle;
       stage_en_q       <= DefaultEn;
       kernel_sel_q     <= DefaultSel;
-      arm_q            <= 1'b0;
-      cancel_q         <= 1'b0;
+      req_q            <= 1'b0;
       rd_addr_q        <= '0;
       send_out_q       <= 1'b0;
       tx_valid_q       <= 1'b0;
@@ -168,8 +170,6 @@ module camera_uart #(
       pending_en_q     <= '0;
       cmd_wait_q       <= '0;
     end else begin
-      arm_q    <= 1'b0;
-      cancel_q <= 1'b0;
       if (tx_valid_q && tx_ready) tx_valid_q <= 1'b0;
       cmd_wait_q <= (rx_valid || state_q == Idle) ? '0 : cmd_wait_q + 1'b1;
 
@@ -180,10 +180,7 @@ module camera_uart #(
           if (rx_valid && !busy_o) begin
             unique case (rx_data)
               "c":     state_q <= CfgEn;
-              "f": begin
-                arm_q   <= 1'b1;
-                state_q <= WaitFrame;
-              end
+              "f":     state_q <= WaitFrame;
               "p": begin
                 period_latched_q <= period_q;
                 period_idx_q     <= '0;
@@ -215,15 +212,20 @@ module camera_uart #(
           end
         end
 
+        // Запрос поднимается, когда домен PCLK снял served прошлого запроса, и снимается, когда
+        // кадр захвачен или ожидание отменено (любым байтом; захват в домене PCLK тоже
+        // прерывается).
         WaitFrame: begin
-          if (done_pulse) begin
+          if (rx_valid) begin
+            req_q   <= 1'b0;
+            state_q <= Idle;
+          end else if (!req_q) begin
+            if (!served) req_q <= 1'b1;
+          end else if (served) begin
+            req_q      <= 1'b0;
             rd_addr_q  <= '0;
             send_out_q <= 1'b0;
             state_q    <= SendRead;
-          end else if (rx_valid) begin
-            // Отмена ожидания: захват в домене PCLK тоже сбрасывается.
-            cancel_q <= 1'b1;
-            state_q  <= Idle;
           end
         end
 
@@ -267,11 +269,11 @@ module camera_uart #(
   // Домен PCLK: обработка и захват кадра.
   // =========================================================================================
   // Конфигурация меняется редко, поэтому переходит в домен PCLK синхронизатором уровня; запрос
-  // кадра и его отмена — импульсами. Кадры вокруг смены конфигурации на выходе цепочки могут
+  // кадра — уровнем req_q. Кадры вокруг смены конфигурации на выходе цепочки могут
   // быть смешанными (см. conv_pipeline.sv), но захват начинается только после ready_o, на
   // следующем кадре камеры, и результат этого кадра целиком вычислен новой конфигурацией.
   logic [CfgW-1:0] cfg_q;
-  logic arm_pulse, cancel_pulse;
+  logic req_pclk;
 
   level_sync #(
       .Width(CfgW)
@@ -281,18 +283,10 @@ module camera_uart #(
       .q_o  (cfg_q)
   );
 
-  pulse_sync u_arm_sync (
-      .src_clk_i  (clk_i),
-      .src_pulse_i(arm_q),
-      .dst_clk_i  (pclk_i),
-      .dst_pulse_o(arm_pulse)
-  );
-
-  pulse_sync u_cancel_sync (
-      .src_clk_i  (clk_i),
-      .src_pulse_i(cancel_q),
-      .dst_clk_i  (pclk_i),
-      .dst_pulse_o(cancel_pulse)
+  level_sync u_req_sync (
+      .clk_i(pclk_i),
+      .d_i  (req_q),
+      .q_o  (req_pclk)
   );
 
   logic gray_valid, gray_sof, out_valid, out_sof;
@@ -326,35 +320,33 @@ module camera_uart #(
 
   // Захват: после запроса — ближайший серый кадр целиком и результат этого же кадра. Результат
   // отстаёт от входа меньше чем на кадр, поэтому первый sof на выходе цепочки после начала
-  // захвата серого кадра — это его результат. Отмена запроса прерывает захват: так буферы пишет
-  // только захват, которого ждёт домен clk_i, и он читает их, когда запись закончена.
-  logic armed_q, raw_on_q, out_wait_q, out_on_q;
+  // захвата серого кадра — это его результат. Захват идёт, только пока поднят запрос, и
+  // прерывается, если запрос сняли: так буферы пишет только захват, которого ждёт домен clk_i, и
+  // он читает их после served, когда запись закончена.
+  logic raw_on_q, out_wait_q, out_on_q, served_q;
   logic [AddrW-1:0] raw_cnt_q, out_cnt_q;
   logic raw_start, out_start, raw_we, out_we;
-  logic done_q, frame_tgl_q;
+  logic frame_tgl_q;
 
-  assign raw_start = armed_q && ready_o && gray_valid && gray_sof;
+  assign raw_start = req_pclk && !served_q && !raw_on_q && !out_wait_q && !out_on_q && ready_o &&
+      gray_valid && gray_sof;
   assign out_start = out_wait_q && out_valid && out_sof;
   assign raw_we = gray_valid && (raw_start || raw_on_q);
   assign out_we = out_valid && (out_start || out_on_q);
 
   always_ff @(posedge pclk_i) begin
     if (rst_pclk_i) begin
-      armed_q     <= 1'b0;
       raw_on_q    <= 1'b0;
       out_wait_q  <= 1'b0;
       out_on_q    <= 1'b0;
+      served_q    <= 1'b0;
       raw_cnt_q   <= '0;
       out_cnt_q   <= '0;
-      done_q      <= 1'b0;
       frame_tgl_q <= 1'b0;
     end else begin
-      done_q <= 1'b0;
       if (gray_valid && gray_sof) frame_tgl_q <= ~frame_tgl_q;
-      if (arm_pulse) armed_q <= 1'b1;
 
       if (raw_start) begin
-        armed_q    <= 1'b0;
         raw_on_q   <= 1'b1;
         out_wait_q <= 1'b1;
         raw_cnt_q  <= AddrW'(1);
@@ -370,27 +362,27 @@ module camera_uart #(
       end else if (out_on_q && out_valid) begin
         if (out_cnt_q == AddrW'(Pixels - 1)) begin
           out_on_q <= 1'b0;
-          done_q   <= 1'b1;  // результат пишется последним
+          served_q <= 1'b1;  // результат пишется последним
         end
         out_cnt_q <= out_cnt_q + 1'b1;
       end
 
-      if (cancel_pulse) begin
-        armed_q    <= 1'b0;
+      // Запрос снят: захват прерывается (отмена), served снимается (конец рукопожатия).
+      if (!req_pclk) begin
         raw_on_q   <= 1'b0;
         out_wait_q <= 1'b0;
         out_on_q   <= 1'b0;
+        served_q   <= 1'b0;
       end
     end
   end
 
   assign frame_o = frame_tgl_q;
 
-  pulse_sync u_done_sync (
-      .src_clk_i  (pclk_i),
-      .src_pulse_i(done_q),
-      .dst_clk_i  (clk_i),
-      .dst_pulse_o(done_pulse)
+  level_sync u_served_sync (
+      .clk_i(clk_i),
+      .d_i  (served_q),
+      .q_o  (served)
   );
 
   pulse_sync u_frame_sync (

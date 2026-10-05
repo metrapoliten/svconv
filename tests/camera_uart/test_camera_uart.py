@@ -104,8 +104,8 @@ async def reports_frame_period(dut):
 
 @cocotb.test()
 async def capture_can_be_cancelled(dut):
-    """Без камеры кадр не приходит; любой байт отменяет ожидание (и захват в домене PCLK), и
-    стенд снова принимает команды."""
+    """Без камеры кадр не приходит; любой байт отменяет ожидание, и стенд снова принимает
+    команды."""
     cocotb.start_soon(Clock(dut.pclk_i, PCLK_NS, unit="ns").start())
     cocotb.start_soon(Clock(dut.clk_i, CLK_NS, unit="ns").start())
     dut.uart_rx_i.value = 1
@@ -123,11 +123,40 @@ async def capture_can_be_cancelled(dut):
     await uart_send(dut, dut.uart_rx_i, b"x", CLKS_PER_BIT)
     await ClockCycles(dut.clk_i, 20)
     assert dut.busy_o.value == 0
-    # Отмена снимает и захват в домене PCLK: иначе он сработал бы, когда камера заработает.
-    assert dut.armed_q.value == 0, "the cancelled capture is still armed in the PCLK domain"
     await uart_send(dut, dut.uart_rx_i, b"p", CLKS_PER_BIT)
     period = int.from_bytes(await uart_recv(dut, dut.uart_tx_o, 4, CLKS_PER_BIT), "little")
     assert period == 0, "no camera frames, so the period is unknown (0)"
+
+
+@cocotb.test()
+async def request_survives_stopped_pclk(dut):
+    """PCLK стоит (камера не работает): запрос, отмена и новый запрос. Когда камера заработает,
+    стенд отвечает на последний запрос кадром — запрос передаётся состоянием, а не событиями,
+    которые остановленный домен мог бы потерять."""
+    cocotb.start_soon(Clock(dut.clk_i, CLK_NS, unit="ns").start())
+    dut.uart_rx_i.value = 1
+    dut.cam_vsync_i.value = 0
+    dut.cam_href_i.value = 0
+    dut.cam_data_i.value = 0
+    dut.rst_i.value = 1
+    dut.rst_pclk_i.value = 1
+    await ClockCycles(dut.clk_i, 3)
+    dut.rst_i.value = 0
+    for cmd in (b"f", b"x", b"f"):
+        await uart_send(dut, dut.uart_rx_i, cmd, CLKS_PER_BIT)
+        await ClockCycles(dut.clk_i, 20)
+    assert dut.busy_o.value == 1, "the second request is not waiting for a frame"
+    # Камера заработала.
+    cocotb.start_soon(Clock(dut.pclk_i, PCLK_NS, unit="ns").start())
+    await ClockCycles(dut.pclk_i, 3)
+    dut.rst_pclk_i.value = 0
+    rng = np.random.default_rng(8)
+    frames = [rng.integers(0, 1 << 16, (CAM_H, CAM_W), dtype=np.uint16) for _ in range(4)]
+    cocotb.start_soon(dvp_camera(dut, frames, H_BLANK, V_BLANK, VSYNC_LEN))
+    data = await uart_recv(dut, dut.uart_tx_o, 2 * W * H, CLKS_PER_BIT, timeout_bits=5000)
+    raw = np.frombuffer(data[: W * H], dtype=np.uint8).reshape(H, W)
+    out = np.frombuffer(data[W * H :], dtype=np.uint8).reshape(H, W)
+    check(raw, out, frames, ["identity"] * 3, [True] * 3)
 
 
 # Тайм-аут незавершённой команды стенда (параметр CmdTimeoutBits) с запасом.
