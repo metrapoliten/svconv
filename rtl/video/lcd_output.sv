@@ -2,7 +2,7 @@
 
 // Вывод кадрового буфера на RGB-LCD: генератор таймингов (video_timing) и чтение кадра с
 // увеличением и центрированием (lcd_frame_reader). Работает на пиксельной частоте дисплея.
-// Тайминги — из документации на дисплей; см. наборы в boards/primer20k.
+// Тайминги — из документации на дисплей; для SH500Q01Z — в boards/mega138k/camera_lcd_top.sv.
 module lcd_output #(
     parameter int unsigned HActive = 480,
     parameter int unsigned HFront = 2,
