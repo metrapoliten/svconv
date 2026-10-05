@@ -81,3 +81,24 @@ async def middle_stage_bypassed(dut):
 @cocotb.test()
 async def edges_only(dut):
     await run_config(dut, ["identity", "identity", "log5"], [False, False, True], 3, 0.0, seed=5)
+
+
+@cocotb.test()
+async def ready_waits_for_every_stage(dut):
+    """ready_o = 1, только когда все каскады загрузили выбранные ядра: смена ядра у одного
+    каскада снимает ready_o, пока именно он загружается."""
+    start_clock(dut)
+    dut.stage_en_i.value = (1 << NUM_STAGES) - 1
+    kernels = ["gauss5", "gauss5", "log5"]
+    dut.kernel_sel_i.value = sum(sel(name) << (s * SEL_W) for s, name in enumerate(kernels))
+    await reset(dut)
+    await ClockCycles(dut.clk_i, 4 * K * K)
+    assert dut.ready_o.value == 1, "kernels were not loaded"
+
+    kernels[NUM_STAGES - 1] = "identity"
+    dut.kernel_sel_i.value = sum(sel(name) << (s * SEL_W) for s, name in enumerate(kernels))
+    await RisingEdge(dut.clk_i)
+    await RisingEdge(dut.clk_i)
+    assert dut.ready_o.value == 0, "ready_o stays high while the last stage reloads"
+    await ClockCycles(dut.clk_i, 4 * K * K)
+    assert dut.ready_o.value == 1, "the last stage did not finish loading"
