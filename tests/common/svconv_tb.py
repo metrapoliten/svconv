@@ -6,17 +6,16 @@
 
 import random
 
+import cocotb
 import numpy as np
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, RisingEdge
+from cocotb.triggers import ClockCycles, First, RisingEdge, with_timeout
 
 # Значение неопределённого (X/Z) выходного пикселя.
 UNDEFINED = -1
 
 
 def start_clock(dut, period_ns: int = 10) -> None:
-    import cocotb
-
     cocotb.start_soon(Clock(dut.clk_i, period_ns, unit="ns").start())
 
 
@@ -264,3 +263,43 @@ def check_ov7670_setup(writes: list[tuple[int, int, int, int]]) -> None:
     width = (hstop - hstart) % OV7670_LINE
     assert width == 640, f"HSTART..HSTOP = {hstart}..{hstop}: {width} pixels, expected 640"
     assert vstop - vstart == 480, f"VSTART..VSTOP = {vstart}..{vstop}: expected 480 lines"
+
+
+def _line(sig) -> int:
+    """Уровень линии с открытым стоком и подтяжкой: z (отпущена) — 1."""
+    return 0 if str(sig.value) == "0" else 1
+
+
+async def ov7670_power_up(dut, clk, timeout_ms: int = 100) -> None:
+    """Запуск камеры в тестах верхних модулей (порты cam_rst_n_o, cam_pwdn_o, cam_scl_io,
+    cam_sda_io; led_n_o[1] = 0 — «камера настроена»). Ждёт аппаратного сброса камеры (RESET# = 0,
+    затем 1) при PWDN = 0, декодирует настройку по SCCB (такт clk) до сигнала «камера настроена» и
+    проверяет итоговые регистры. Модель камеры выдаёт кадры только после этого — как настоящая,
+    которой нужны сброс и настройка. Дальше RESET# и PWDN не должны меняться. Весь запуск — не
+    дольше timeout_ms (у ov7670_init — около 45 мс)."""
+    await with_timeout(_power_up(dut, clk), timeout_ms, "ms")
+    cocotb.start_soon(_camera_stays_on(dut))
+
+
+async def _power_up(dut, clk) -> None:
+    monitor = SccbMonitor(clk, lambda: (_line(dut.cam_scl_io), _line(dut.cam_sda_io)))
+    task = cocotb.start_soon(monitor.run())
+    while dut.cam_rst_n_o.value != 0:
+        await dut.cam_rst_n_o.value_change
+    assert not monitor.writes, "SCCB writes before the hardware reset of the camera"
+    await dut.cam_rst_n_o.value_change
+    assert not monitor.writes, "SCCB writes during the hardware reset of the camera"
+    assert dut.cam_pwdn_o.value == 0, "the camera is powered down (PWDN = 1)"
+    while int(dut.led_n_o.value) & 0b10:
+        await First(
+            dut.led_n_o.value_change, dut.cam_rst_n_o.value_change, dut.cam_pwdn_o.value_change
+        )
+        assert dut.cam_rst_n_o.value == 1 and dut.cam_pwdn_o.value == 0, "camera reset during setup"
+    task.cancel()
+    assert monitor.writes, "the camera is reported configured without SCCB writes"
+    check_ov7670_setup(monitor.writes)
+
+
+async def _camera_stays_on(dut) -> None:
+    await First(dut.cam_rst_n_o.value_change, dut.cam_pwdn_o.value_change)
+    raise AssertionError("RESET# or PWDN of the camera changed after the setup")

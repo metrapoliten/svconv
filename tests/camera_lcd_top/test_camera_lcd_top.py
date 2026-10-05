@@ -1,5 +1,6 @@
 """Сквозной тест camera_lcd_top — того, что загружается в Mega 138K Pro: генератор 50 МГц,
-PLL Gowin (35 МГц для дисплея, 25 МГц для XCLK), камера 640×480, режим по умолчанию
+PLL Gowin (35 МГц для дисплея, 25 МГц для XCLK), запуск камеры (аппаратный сброс и настройка
+по SCCB — кадры модель камеры выдаёт только после них), камера 640×480, режим по умолчанию
 (gauss5 -> gauss5 -> log5), экран 800×480 RGB666 с кадром по центру. Снимок экрана должен
 совпасть с моделью."""
 
@@ -9,7 +10,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge, Timer
 
 from svconv_model import KERNELS, display_frame, pipeline, rgb565_to_rgb888, rgb888_to_gray
-from svconv_tb import dvp_camera
+from svconv_tb import dvp_camera, ov7670_power_up
 
 CAM_W, CAM_H = 640, 480
 SCREEN_W, SCREEN_H = 800, 480
@@ -40,7 +41,9 @@ async def measure_period_ns(clk, cycles: int = 100) -> float:
 @cocotb.test()
 async def camera_frame_on_screen(dut):
     cocotb.start_soon(Clock(dut.clk50_i, 20, unit="ns").start())
-    # PCLK камеры — 25 МГц, как XCLK от PLL (у OV7670 без делителя PCLK = XCLK).
+    # PCLK камеры — 25 МГц, как XCLK от PLL (у OV7670 без делителя PCLK = XCLK); фронты сдвинуты
+    # относительно clk50 на задержку проводов и камеры.
+    await Timer(7, unit="ns")
     cocotb.start_soon(Clock(dut.cam_pclk_i, 40, unit="ns").start())
     dut.btn_n_i.value = 1
     dut.cam_vsync_i.value = 0
@@ -54,6 +57,7 @@ async def camera_frame_on_screen(dut):
     assert abs(lcd_period - 1000 / 35) < 0.1, f"LCD clock period {lcd_period:.3f} ns"
     assert abs(xclk_period - 1000 / 25) < 0.1, f"XCLK period {xclk_period:.3f} ns"
 
+    await ov7670_power_up(dut, dut.clk50_i)
     # Один и тот же кадр несколько раз: буфер кадра одинарный, так на экране не будет разрыва.
     rgb565 = np.random.default_rng(1).integers(0, 1 << 16, (CAM_H, CAM_W), dtype=np.uint16)
     await dvp_camera(dut, [rgb565] * 3, pclk=dut.cam_pclk_i)
