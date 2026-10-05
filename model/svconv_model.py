@@ -159,32 +159,22 @@ def rgb888_to_gray(rgb: np.ndarray) -> np.ndarray:
     return y.astype(np.uint8)
 
 
-def conv1d_valid(row: np.ndarray, w: np.ndarray) -> np.ndarray:
-    """Одномерная свёртка (корреляция) строки с ядром длины K без выхода за границы.
-
-    Возвращает len(row) - K + 1 значений: out[c] = sum_j row[c + j] * w[j].
-    """
-    k = len(w)
-    n = len(row) - k + 1
-    out = np.zeros(n, dtype=np.int64)
-    for j in range(k):
-        out += row[j : j + n].astype(np.int64) * int(w[j])
-    return out
-
-
 def conv2d_acc(img: np.ndarray, w: np.ndarray) -> np.ndarray:
-    """Накопленные суммы acc для внутренних пикселей (H-K+1)×(W-K+1).
+    """Накопленные суммы acc для внутренних пикселей (H-K+1)×(W-K+1):
+    acc[r, c] = sum_{i,j} img[r + i, c + j] * w[i, j].
 
-    Двумерная свёртка раскладывается на одномерные, как в схеме курса: строка результата —
-    это сумма одномерных свёрток K соседних строк изображения с соответствующими строками ядра.
+    Каждый вес умножается сразу на весь сдвинутый кадр. Аппаратный каскад складывает те же
+    произведения в другом порядке — сначала по строкам окна, как в схеме курса, — в целых
+    числах результат от порядка не зависит.
     """
-    img = np.asarray(img)
+    img = np.asarray(img, dtype=np.int64)
     k = w.shape[0]
-    h = img.shape[0]
-    rows = []
-    for r in range(h - k + 1):
-        rows.append(sum(conv1d_valid(img[r + i], w[i]) for i in range(k)))
-    return np.array(rows, dtype=np.int64)
+    out_h, out_w = img.shape[0] - k + 1, img.shape[1] - k + 1
+    acc = np.zeros((out_h, out_w), dtype=np.int64)
+    for i in range(k):
+        for j in range(k):
+            acc += img[i : i + out_h, j : j + out_w] * int(w[i, j])
+    return acc
 
 
 def postprocess(acc: np.ndarray, shift: int, mode: str) -> np.ndarray:
