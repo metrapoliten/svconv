@@ -82,47 +82,17 @@ module camera_lcd_top #(
   // Значения IDIV/FBDIV/MDIV/ODIV0 — из примера Sipeed 800_480_screen.
   logic lcd_clk, cam_clk, pll_lock;
 
+  // Указаны только параметры, отличные от значений по умолчанию (те же в модели Gowin для
+  // симуляции и в библиотеке синтеза). Входы подключены все: неподключённый вход в синтезе и
+  // в модели ведёт себя по-разному (например, ENCLKx = 0 выключает выход).
   PLL #(
-      .FCLKIN("50"),
-      .IDIV_SEL(1),
-      .FBDIV_SEL(1),
-      .MDIV_SEL(21),
-      .MDIV_FRAC_SEL(0),
-      .ODIV0_SEL(30),
-      .ODIV0_FRAC_SEL(0),
-      .ODIV1_SEL(42),
-      .ODIV2_SEL(8),
-      .ODIV3_SEL(8),
-      .ODIV4_SEL(8),
-      .ODIV5_SEL(8),
-      .ODIV6_SEL(8),
-      .CLKFB_SEL("INTERNAL"),
-      .CLKOUT0_EN("TRUE"),
-      .CLKOUT1_EN("TRUE"),
-      .CLKOUT2_EN("FALSE"),
-      .CLKOUT3_EN("FALSE"),
-      .CLKOUT4_EN("FALSE"),
-      .CLKOUT5_EN("FALSE"),
-      .CLKOUT6_EN("FALSE"),
-      .DYN_IDIV_SEL("FALSE"),
-      .DYN_FBDIV_SEL("FALSE"),
-      .DYN_MDIV_SEL("FALSE"),
-      .DYN_ODIV0_SEL("FALSE"),
-      .DYN_ODIV1_SEL("FALSE"),
-      .DYN_ODIV2_SEL("FALSE"),
-      .DYN_ODIV3_SEL("FALSE"),
-      .DYN_ODIV4_SEL("FALSE"),
-      .DYN_ODIV5_SEL("FALSE"),
-      .DYN_ODIV6_SEL("FALSE"),
-      .DYN_DT0_SEL("FALSE"),
-      .DYN_DT1_SEL("FALSE"),
-      .DYN_DT2_SEL("FALSE"),
-      .DYN_DT3_SEL("FALSE"),
-      .DYN_ICP_SEL("FALSE"),
-      .DYN_LPF_SEL("FALSE"),
-      .RESET_I_EN("FALSE"),
-      .RESET_O_EN("FALSE"),
-      .SSC_EN("FALSE")
+      .FCLKIN    ("50"),
+      .IDIV_SEL  (1),
+      .FBDIV_SEL (1),
+      .MDIV_SEL  (21),
+      .ODIV0_SEL (30),
+      .ODIV1_SEL (42),
+      .CLKOUT1_EN("TRUE")
   ) u_pll (
       .LOCK         (pll_lock),
       .CLKOUT0      (lcd_clk),
