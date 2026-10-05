@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 
 // Вывод кадра SrcWidth×SrcHeight из кадрового буфера на RGB-дисплей по центру экрана; вне
-// картинки — чёрный цвет. Пиксель в оттенках серого выводится во всех трёх цветах (R = G = B):
-// RBits/GBits/BBits старших бит (RGB565 — 5/6/5, RGB666 — 6/6/6, RGB888 — 8/8/8).
+// картинки — чёрный цвет. Выход — уровень серого: 6 старших бит пикселя (дисплей подключён в
+// формате RGB666, один и тот же уровень подаётся на R, G и B).
 //
 // По координатам от video_timing вычисляется адрес в буфере: (y - OffY) * SrcWidth + (x - OffX).
 // Чтение буфера занимает такт, поэтому DE задерживается на столько же, чтобы цвет и DE на выходе
@@ -14,9 +14,6 @@ module lcd_frame_reader #(
     parameter int unsigned VW = 10,  // разрядность y_i
     parameter int unsigned SrcWidth = 640,
     parameter int unsigned SrcHeight = 480,
-    parameter int unsigned RBits = 6,
-    parameter int unsigned GBits = 6,
-    parameter int unsigned BBits = 6,
     localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight)
 ) (
     input logic clk_i,  // пиксельная частота
@@ -31,10 +28,8 @@ module lcd_frame_reader #(
     input  logic [      7:0] fb_data_i,
 
     // Выход на дисплей.
-    output logic             de_o,
-    output logic [RBits-1:0] r_o,
-    output logic [GBits-1:0] g_o,
-    output logic [BBits-1:0] b_o
+    output logic       de_o,
+    output logic [5:0] gray_o
 );
 
   localparam int unsigned OffX = (HActive - SrcWidth) / 2;
@@ -66,10 +61,8 @@ module lcd_frame_reader #(
   end
 
   always_ff @(posedge clk_i) begin
-    de_o <= de_q;
-    r_o  <= in_image_q ? fb_data_i[7-:RBits] : '0;
-    g_o  <= in_image_q ? fb_data_i[7-:GBits] : '0;
-    b_o  <= in_image_q ? fb_data_i[7-:BBits] : '0;
+    de_o   <= de_q;
+    gray_o <= in_image_q ? fb_data_i[7:2] : '0;
   end
 
 endmodule

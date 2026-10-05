@@ -7,10 +7,7 @@ module lcd_output_tb #(
     parameter int unsigned VActive = 30,
     parameter int unsigned VBlank = 9,
     parameter int unsigned SrcWidth = 16,
-    parameter int unsigned SrcHeight = 12,
-    parameter int unsigned RBits = 6,
-    parameter int unsigned GBits = 6,
-    parameter int unsigned BBits = 6
+    parameter int unsigned SrcHeight = 12
 ) (
     input logic       clk_w_i,
     input logic       rst_w_i,
@@ -18,12 +15,10 @@ module lcd_output_tb #(
     input logic       sof_i,
     input logic [7:0] data_i,
 
-    input  logic             clk_pix_i,
-    input  logic             rst_pix_i,
-    output logic             de_o,
-    output logic [RBits-1:0] r_o,
-    output logic [GBits-1:0] g_o,
-    output logic [BBits-1:0] b_o
+    input  logic       clk_pix_i,
+    input  logic       rst_pix_i,
+    output logic       de_o,
+    output logic [5:0] gray_o
 );
 
   localparam int unsigned AddrW = $clog2(SrcWidth * SrcHeight);
@@ -51,19 +46,14 @@ module lcd_output_tb #(
       .VActive  (VActive),
       .VBlank   (VBlank),
       .SrcWidth (SrcWidth),
-      .SrcHeight(SrcHeight),
-      .RBits    (RBits),
-      .GBits    (GBits),
-      .BBits    (BBits)
+      .SrcHeight(SrcHeight)
   ) u_lcd (
       .clk_i    (clk_pix_i),
       .rst_i    (rst_pix_i),
       .fb_addr_o(fb_addr),
       .fb_data_i(fb_data),
       .de_o     (de_o),
-      .r_o      (r_o),
-      .g_o      (g_o),
-      .b_o      (b_o)
+      .gray_o   (gray_o)
   );
 
 endmodule

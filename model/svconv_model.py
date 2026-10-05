@@ -213,24 +213,15 @@ def pipeline(img: np.ndarray, kernels: list[Kernel]) -> np.ndarray:
     return img
 
 
-def gray_to_rgb(img: np.ndarray, bits: tuple[int, int, int] = (5, 6, 5)) -> np.ndarray:
-    """Оттенки серого (uint8) -> цвет с R = G = B, как на выходе lcd_frame_reader: каждый канал —
-    старшие bits[i] бит серого; каналы упакованы в одно число {R, G, B} (RGB565 по умолчанию)."""
-    rb, gb, bb = bits
-    g = np.asarray(img, dtype=np.uint32)
-    return ((g >> (8 - rb)) << (gb + bb)) | ((g >> (8 - gb)) << bb) | (g >> (8 - bb))
-
-
-def display_frame(
-    img: np.ndarray, width: int, height: int, bits: tuple[int, int, int] = (6, 6, 6)
-) -> np.ndarray:
-    """Что видно на экране width×height (цвет упакован как в gray_to_rgb): img по центру
-    (смещения округляются вниз), вокруг — чёрный."""
+def display_frame(img: np.ndarray, width: int, height: int) -> np.ndarray:
+    """Что видно на экране width×height, как на выходе lcd_frame_reader: уровень серого RGB666
+    (6 старших бит пикселя, один и тот же на R, G и B), img по центру (смещения округляются
+    вниз), вокруг — чёрный."""
     img = np.asarray(img, dtype=np.uint8)
     h, w = img.shape
     if w > width or h > height:
         raise ValueError(f"image {w}x{h} does not fit the display {width}x{height}")
-    screen = np.zeros((height, width), dtype=np.uint32)
+    screen = np.zeros((height, width), dtype=np.uint8)
     off_x, off_y = (width - w) // 2, (height - h) // 2
-    screen[off_y : off_y + h, off_x : off_x + w] = gray_to_rgb(img, bits)
+    screen[off_y : off_y + h, off_x : off_x + w] = img >> 2
     return screen

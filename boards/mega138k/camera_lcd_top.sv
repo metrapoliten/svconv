@@ -252,7 +252,7 @@ module camera_lcd_top #(
   // --- Обработка и вывод ------------------------------------------------------------------
   logic pipe_ready, frame;
   logic lcd_de;
-  logic [5:0] lcd_r, lcd_g, lcd_b;
+  logic [5:0] lcd_gray;
 
   camera_display #(
       .Width     (CamWidth),
@@ -268,10 +268,7 @@ module camera_lcd_top #(
       .HActive   (800),
       .HBlank    (392),
       .VActive   (480),
-      .VBlank    (53),
-      .RBits     (6),
-      .GBits     (6),
-      .BBits     (6)
+      .VBlank    (53)
   ) u_display (
       .pclk_i      (cam_pclk_i),
       .rst_pclk_i  (rst_pclk),
@@ -285,9 +282,7 @@ module camera_lcd_top #(
       .lcd_clk_i   (lcd_clk),
       .rst_lcd_i   (rst_lcd_q[1]),
       .lcd_de_o    (lcd_de),
-      .lcd_r_o     (lcd_r),
-      .lcd_g_o     (lcd_g),
-      .lcd_b_o     (lcd_b)
+      .lcd_gray_o  (lcd_gray)
   );
 
   // --- Выводы дисплея ---------------------------------------------------------------------
@@ -327,9 +322,9 @@ module camera_lcd_top #(
 
   always_ff @(posedge lcd_clk) begin
     lcd_de_q <= lcd_de;
-    lcd_r_q  <= lcd_r;
-    lcd_g_q  <= lcd_g;
-    lcd_b_q  <= lcd_b;
+    lcd_r_q  <= lcd_gray;
+    lcd_g_q  <= lcd_gray;
+    lcd_b_q  <= lcd_gray;
   end
 
   assign lcd_de_o = lcd_de_q;

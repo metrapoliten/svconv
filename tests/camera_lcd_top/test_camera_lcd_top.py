@@ -46,21 +46,13 @@ async def camera_frame_on_screen(dut):
     assert int(dut.led_n_o.value) & 0b1000 == 0, "kernels are not loaded"
     # Снимок — так, как его принимает панель: по спаду DCLK на выводах разъёма (ILI6122 при
     # CLKPOL = L), с проверкой структуры DE и периодов.
-    screen = await capture_screen(
-        dut.lcd_clk_o,
-        dut.lcd_de_o,
-        dut.lcd_r_o,
-        dut.lcd_g_o,
-        dut.lcd_b_o,
-        SCREEN,
-        TOTAL,
-        LCD_PERIOD_NS,
-    )
+    pins = [dut.lcd_r_o, dut.lcd_g_o, dut.lcd_b_o]
+    screen = await capture_screen(dut.lcd_clk_o, dut.lcd_de_o, pins, SCREEN, TOTAL, LCD_PERIOD_NS)
 
     gray = rgb888_to_gray(rgb565_to_rgb888(rgb565))
     expected = display_frame(pipeline(gray, [KERNELS[n] for n in DEFAULT_CHAIN]), *SCREEN)
     bad = np.argwhere(screen != expected)
     assert not len(bad), (
         f"{len(bad)} mismatching screen pixels, first at {tuple(int(v) for v in bad[0])}: "
-        f"got {screen[tuple(bad[0])]:05x}, expected {expected[tuple(bad[0])]:05x}"
+        f"got {screen[tuple(bad[0])]}, expected {expected[tuple(bad[0])]}"
     )

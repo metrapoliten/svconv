@@ -11,7 +11,6 @@ from svconv_model import (
     conv2d_acc,
     convolve,
     display_frame,
-    gray_to_rgb,
     kernel_rom_bytes,
     pad_kernel,
     pipeline,
@@ -157,22 +156,12 @@ def test_sample_image_is_deterministic_and_varied(size: tuple[int, int]) -> None
     assert len(np.unique(img)) > 8
 
 
-def test_gray_to_rgb() -> None:
-    np.testing.assert_array_equal(gray_to_rgb(np.array([0, 255, 128])), [0x0000, 0xFFFF, 0x8410])
-    # RGB666: 18 бит, 128 -> 0b100000 в каждом канале.
-    np.testing.assert_array_equal(
-        gray_to_rgb(np.array([0, 255, 128]), (6, 6, 6)), [0, 0x3FFFF, 0b100000_100000_100000]
-    )
-
-
 def test_display_frame_centers() -> None:
     img = np.array([[10, 20], [30, 40]], dtype=np.uint8)
-    screen = display_frame(img, 5, 4, bits=(5, 6, 5))
-    # Картинка 2×2 со смещением ((5-2)//2, (4-2)//2) = (1, 1).
+    screen = display_frame(img, 5, 4)
+    # Картинка 2×2 со смещением ((5-2)//2, (4-2)//2) = (1, 1); уровни — 6 старших бит.
     assert screen.shape == (4, 5)
-    assert screen[1, 1] == gray_to_rgb(np.array([10]))[0]
-    assert screen[1, 2] == gray_to_rgb(np.array([20]))[0]
-    assert screen[2, 2] == gray_to_rgb(np.array([40]))[0]
+    assert screen[1, 1] == 10 >> 2 and screen[1, 2] == 20 >> 2 and screen[2, 2] == 40 >> 2
     assert screen[0].sum() == 0 and screen[:, 0].sum() == 0 and screen[:, 3:].sum() == 0
     with pytest.raises(ValueError):
         display_frame(img, 1, 4)

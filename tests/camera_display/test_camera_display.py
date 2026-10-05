@@ -60,14 +60,7 @@ async def run(dut, kernels: list[str], enabled: list[bool], seed: int) -> None:
     rgb565 = np.random.default_rng(seed).integers(0, 1 << 16, (CAM_H, CAM_W), dtype=np.uint16)
     await dvp_camera(dut, [rgb565] * 4)
     screen = await capture_screen(
-        dut.lcd_clk_i,
-        dut.lcd_de_o,
-        dut.lcd_r_o,
-        dut.lcd_g_o,
-        dut.lcd_b_o,
-        SCREEN,
-        TOTAL,
-        LCD_PERIOD_NS,
+        dut.lcd_clk_i, dut.lcd_de_o, [dut.lcd_gray_o], SCREEN, TOTAL, LCD_PERIOD_NS
     )
 
     gray = rgb888_to_gray(rgb565_to_rgb888(rgb565))
@@ -76,7 +69,7 @@ async def run(dut, kernels: list[str], enabled: list[bool], seed: int) -> None:
     bad = np.argwhere(screen != expected)
     assert not len(bad), (
         f"{len(bad)} mismatching screen pixels, first at {tuple(int(v) for v in bad[0])}: "
-        f"got {screen[tuple(bad[0])]:04x}, expected {expected[tuple(bad[0])]:04x}"
+        f"got {screen[tuple(bad[0])]}, expected {expected[tuple(bad[0])]}"
     )
     # Выходной кадр выходит, пока идёт следующий входной: полностью вышли 3 из 4.
     assert frames_seen >= 3, f"processed frames: {frames_seen}"

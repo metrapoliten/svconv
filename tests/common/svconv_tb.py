@@ -125,42 +125,41 @@ async def start_camera_lcd_top(dut) -> None:
 async def capture_screen(
     clk,
     de,
-    r,
-    g,
-    b,
+    levels: list,
     size: tuple[int, int],
     total: tuple[int, int],
     clk_period_ns: float,
-    bits: tuple[int, int, int] = (6, 6, 6),
     timeout_frames: int = 3,
 ) -> np.ndarray:
-    """Один кадр экрана RGB-LCD в режиме DE (сигналы clk, de, r, g, b) — так, как его принимает
-    панель: сигналы выбираются по спаду такта дисплея. Экран size = (ширина, высота), полный
-    период total = (тактов в строке, строк в кадре). Проверяет интерфейс: RGB и DE не меняются на
-    спаде такта, в кадре «высота» строк по «ширина» тактов с DE = 1, период строки и кадра — по
-    total. Всё — не дольше timeout_frames кадров. Цвет упакован как в gray_to_rgb() модели."""
+    """Один кадр экрана RGB-LCD в режиме DE — так, как его принимает панель: сигналы выбираются
+    по спаду такта дисплея clk. levels — каналы цвета (на выводах платы — R, G и B, у модулей —
+    один уровень серого), они должны совпадать. Экран size = (ширина, высота), полный период
+    total = (тактов в строке, строк в кадре). Проверяет интерфейс: DE и цвет не меняются на спаде
+    такта, в кадре «высота» строк по «ширина» тактов с DE = 1, период строки и кадра — по total.
+    Всё — не дольше timeout_frames кадров. Возвращает уровни серого, как display_frame() модели."""
     width, height = size
     h_total, v_total = total
     timeout_ns = round(timeout_frames * h_total * v_total * clk_period_ns)
     cycle = 0
 
-    def outputs() -> tuple[int, int, int, int]:
-        return int(de.value), int(r.value), int(g.value), int(b.value)
+    def outputs() -> tuple[int, ...]:
+        return (int(de.value), *(int(level.value) for level in levels))
 
-    async def next_sample() -> tuple[int, int, int, int]:
+    async def next_sample() -> tuple[int, int]:
         nonlocal cycle
         await FallingEdge(clk)
         cycle += 1
         sample = outputs()
         await ReadOnly()
-        assert outputs() == sample, f"RGB/DE change at the falling clock edge {cycle}"
-        return sample
+        assert outputs() == sample, f"DE/colour change at the falling clock edge {cycle}"
+        assert len(set(sample[1:])) == 1, f"colour channels differ at clock {cycle}: {sample[1:]}"
+        return sample[0], sample[1]
 
     async def capture() -> np.ndarray:
         # Начало кадра — DE = 1 после паузы длиннее строки (между строками пауза короче).
         idle = 0
         while True:
-            de_v, r_v, g_v, b_v = await next_sample()
+            de_v, level = await next_sample()
             if de_v and idle > h_total:
                 break
             idle = 0 if de_v else idle + 1
@@ -174,17 +173,17 @@ async def capture_screen(
                     break
                 line_starts.append(cycle)
             if de_v:
-                pixels.append((r_v << (bits[1] + bits[2])) | (g_v << bits[2]) | b_v)
+                pixels.append(level)
             if not de_v and prev_de:  # конец строки
                 run = cycle - line_starts[-1]
                 assert run == width, f"line {len(line_starts) - 1}: DE = 1 for {run} clocks"
             prev_de = de_v
-            de_v, r_v, g_v, b_v = await next_sample()
+            de_v, level = await next_sample()
         periods = set(np.diff(line_starts).tolist())
         assert periods == {h_total}, f"line periods {sorted(periods)} clocks, expected {h_total}"
         frame = cycle - frame_start
         assert frame == h_total * v_total, f"frame period {frame}, expected {h_total * v_total}"
-        return np.array(pixels, dtype=np.uint32).reshape(height, width)
+        return np.array(pixels, dtype=np.uint8).reshape(height, width)
 
     return await with_timeout(capture(), timeout_ns, "ns")
 

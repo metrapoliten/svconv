@@ -2,8 +2,6 @@
 интерфейс (DE, периоды строки и кадра) — с параметрами; это проверяет capture_screen(). Параметры
 совпадают с lcd_output_tb.sv."""
 
-import os
-
 import cocotb
 import numpy as np
 from cocotb.clock import Clock
@@ -16,7 +14,6 @@ SCREEN = (40, 30)
 TOTAL = (40 + 12, 30 + 9)
 SRC_W, SRC_H = 16, 12
 PIX_PERIOD_NS = 13
-BITS = tuple(int(v) for v in os.environ["BITS"].split(","))
 
 
 async def write_frame(dut, img: np.ndarray) -> None:
@@ -30,9 +27,7 @@ async def write_frame(dut, img: np.ndarray) -> None:
 
 
 async def screen(dut) -> np.ndarray:
-    return await capture_screen(
-        dut.clk_pix_i, dut.de_o, dut.r_o, dut.g_o, dut.b_o, SCREEN, TOTAL, PIX_PERIOD_NS, BITS
-    )
+    return await capture_screen(dut.clk_pix_i, dut.de_o, [dut.gray_o], SCREEN, TOTAL, PIX_PERIOD_NS)
 
 
 async def setup(dut) -> None:
@@ -56,11 +51,11 @@ async def shows_centered_frame(dut):
     img = sample_image(SRC_W, SRC_H)
     await write_frame(dut, img)
     got = await screen(dut)
-    expected = display_frame(img, *SCREEN, BITS)
+    expected = display_frame(img, *SCREEN)
     bad = np.argwhere(got != expected)
     assert not len(bad), (
         f"{len(bad)} mismatching screen pixels, first at {tuple(int(v) for v in bad[0])}: "
-        f"got {got[tuple(bad[0])]:05x}, expected {expected[tuple(bad[0])]:05x}"
+        f"got {got[tuple(bad[0])]}, expected {expected[tuple(bad[0])]}"
     )
 
 
@@ -83,5 +78,5 @@ async def write_restarts_at_sof(dut):
     img = sample_image(SRC_W, SRC_H)
     await write_frame(dut, img)
     got = await screen(dut)
-    expected = display_frame(img, *SCREEN, BITS)
+    expected = display_frame(img, *SCREEN)
     assert (got == expected).all(), f"{int((got != expected).sum())} mismatching pixels"

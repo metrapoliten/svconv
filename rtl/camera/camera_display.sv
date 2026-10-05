@@ -7,7 +7,7 @@
 //   домен пикселей LCD: lcd_output читает frame_buffer
 //
 // Конфигурация цепочки (stage_en_i, kernel_sel_i) задаётся в домене PCLK; её следует менять
-// редко (см. conv_pipeline). Формат цвета дисплея — RBits/GBits/BBits.
+// редко (см. conv_pipeline). На дисплей выходит уровень серого RGB666 (см. lcd_frame_reader).
 module camera_display #(
     // Обработка.
     parameter int unsigned Width = 160,
@@ -23,10 +23,7 @@ module camera_display #(
     parameter int unsigned HActive = 800,
     parameter int unsigned HBlank = 392,
     parameter int unsigned VActive = 480,
-    parameter int unsigned VBlank = 53,
-    parameter int unsigned RBits = 6,
-    parameter int unsigned GBits = 6,
-    parameter int unsigned BBits = 6
+    parameter int unsigned VBlank = 53
 ) (
     // Камера.
     input logic       pclk_i,
@@ -41,12 +38,10 @@ module camera_display #(
     output logic frame_o,  // импульс на каждый обработанный кадр
 
     // Дисплей.
-    input  logic             lcd_clk_i,
-    input  logic             rst_lcd_i,  // синхронный сброс в домене LCD
-    output logic             lcd_de_o,
-    output logic [RBits-1:0] lcd_r_o,
-    output logic [GBits-1:0] lcd_g_o,
-    output logic [BBits-1:0] lcd_b_o
+    input logic lcd_clk_i,
+    input logic rst_lcd_i,  // синхронный сброс в домене LCD
+    output logic lcd_de_o,
+    output logic [5:0] lcd_gray_o  // уровень серого, RGB666: один и тот же на R, G и B
 );
 
   localparam int unsigned AddrW = $clog2(Width * Height);
@@ -104,19 +99,14 @@ module camera_display #(
       .VActive  (VActive),
       .VBlank   (VBlank),
       .SrcWidth (Width),
-      .SrcHeight(Height),
-      .RBits    (RBits),
-      .GBits    (GBits),
-      .BBits    (BBits)
+      .SrcHeight(Height)
   ) u_lcd (
       .clk_i    (lcd_clk_i),
       .rst_i    (rst_lcd_i),
       .fb_addr_o(fb_addr),
       .fb_data_i(fb_data),
       .de_o     (lcd_de_o),
-      .r_o      (lcd_r_o),
-      .g_o      (lcd_g_o),
-      .b_o      (lcd_b_o)
+      .gray_o   (lcd_gray_o)
   );
 
 endmodule
