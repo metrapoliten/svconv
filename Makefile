@@ -45,7 +45,7 @@ lint:
 format:
 	@set -e; for f in $(SV_SOURCES); do verible-verilog-format --verify $$f; done
 
-# Доказательства идут от секунд до ~3 минут (дольше всех — uart_rx), все вместе — около 5 минут;
+# Доказательства идут от секунд до ~1.5 минуты (дольше всех — kernel_rom), все вместе — около 3 минут;
 # одно можно запустить так: make formal SBY_FILES=formal/uart_tx/uart_tx.sby
 formal:
 	python3 model/gen_hex.py random --count 78 --seed 1 -o formal/kernel_rom/rom.hex

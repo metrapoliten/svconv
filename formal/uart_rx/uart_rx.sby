@@ -1,18 +1,17 @@
-# Ограниченная проверка (BMC): в течение 170 тактов от сброса — это два кадра подряд при любых
-# байтах и паузах — uart_rx принимает ровно то, что передаёт uart_tx. Запуск: make formal
-# (около 3 минут). Полное доказательство (k-индукция) требует инвариантов о внутреннем
-# состоянии приёмника относительно фазы передатчика, а их нельзя записать в обёртке без
-# иерархических ссылок; ошибки кадра, помехи и отклонение скорости проверяет tests/uart_rx.
+# Полное доказательство (k-индукция): при любых байтах и паузах uart_rx принимает ровно то, что
+# передаёт uart_tx. Запуск: make formal. Обёртка ссылается на внутренние регистры модулей,
+# поэтому исходники читает фронтенд read_slang (есть и в нативном yosys, и в YoWASP; в YoWASP
+# нет потоков, отсюда --threads 1). Ошибки кадра, помехи и отклонение скорости проверяет
+# tests/uart_rx.
 [options]
-mode bmc
-depth 170
+mode prove
+depth 90
 
 [engines]
 smtbmc yices
 
 [script]
-read_verilog -sv -formal uart_tx.sv uart_rx.sv level_sync.sv
-read_verilog -sv -formal uart_rx_fv.sv
+read_slang --threads 1 --top uart_rx_fv uart_tx.sv uart_rx.sv level_sync.sv uart_rx_fv.sv
 prep -top uart_rx_fv
 
 [files]
