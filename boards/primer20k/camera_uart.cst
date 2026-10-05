@@ -11,48 +11,52 @@ IO_PORT "uart_rx_i" IO_TYPE=LVCMOS33 PULL_MODE=UP BANK_VCCIO=3.3;
 IO_LOC "uart_tx_o" M11;
 IO_PORT "uart_tx_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
 
-// Камера, данные D0..D7 — гребёнка J12 (схема дока 3713, лист «DVP Carmera»): контакты
-// 9 (D0), 11 (D1), 12 (D2), 10 (D3), 8 (D4), 7 (D5), 6 (D6), 5 (D7).
-IO_LOC "cam_data_i[0]" T12;
-IO_PORT "cam_data_i[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[1]" T11;
-IO_PORT "cam_data_i[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[2]" P11;
-IO_PORT "cam_data_i[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[3]" R11;
-IO_PORT "cam_data_i[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[4]" M15;
-IO_PORT "cam_data_i[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[5]" M14;
-IO_PORT "cam_data_i[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[6]" J16;
-IO_PORT "cam_data_i[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_data_i[7]" J14;
-IO_PORT "cam_data_i[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-
-// Камера, управление — гребёнка J14 (схема дока 3713, листы 1 и «Things»; бывшие линии
-// микрофонной решётки): 5 RESET, 6 PWDN, 7 VSYNC, 8 HREF, 9 XCLK, 10 PCLK, 11 SIOC, 12 SIOD.
-// PCLK — на T7: это GCLKT_3 (таблица выводов GW2A-18, корпус PG256), PCLK идёт по глобальной
-// тактовой сети; остальные выводы гребёнок J12/J14 тактовыми не являются.
-// Контакт 6 (T9) на доке идёт ещё и на вход WS2812 — на нём PWDN, всегда 0.
+// Камера — по порядку выводов модуля 2×9 (таблица — в camera_uart_top.sv). Номера выводов ПЛИС —
+// по схеме дока 3713 (J12 — лист «DVP Carmera», J14 — бывшие линии микрофонной решётки).
+//   J12: 5 J14, 6 J16, 7 M14, 8 M15, 9 T12, 10 R11, 11 T11, 12 P11
+//   J14: 5 P9, 6 T9, 7 T8, 8 P8, 9 R8, 10 T7, 11 T6, 12 P6
+// PCLK — на T7: это GCLKT_3 (UG110, корпус PG256), PCLK идёт по глобальной тактовой сети; R8 —
+// GCLKC_3, при одиночном сигнале не тактовый, остальные выводы гребёнок тактовыми не являются.
+// P9 и T9 — двухфункциональные выводы конфигурации (DOUT, DIN), T9 на доке идёт ещё и на вход
+// WS2812: на них выходы ПЛИС RESET и PWDN (PWDN всегда 0), камера их не драйвит.
 // SIOC/SIOD — открытый сток с внутренней подтяжкой ПЛИС к 3,3 В (на модулях 2×9 своей
 // подтяжки часто нет; если SCCB не работает — внешние 4,7–10 кОм к 3,3 В).
-IO_LOC "cam_pclk_i" T7;
-IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_pwdn_o" T9;
-IO_PORT "cam_pwdn_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_vsync_i" T8;
+
+// J12.
+IO_LOC "cam_scl_io" J14;
+IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_sda_io" J16;
+IO_PORT "cam_sda_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_vsync_i" M14;
 IO_PORT "cam_vsync_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_href_i" P8;
+IO_LOC "cam_href_i" M15;
 IO_PORT "cam_href_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
-IO_LOC "cam_xclk_o" R8;
+IO_LOC "cam_data_i[2]" T12;
+IO_PORT "cam_data_i[2]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_xclk_o" R11;
 IO_PORT "cam_xclk_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[7]" T11;
+IO_PORT "cam_data_i[7]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[6]" P11;
+IO_PORT "cam_data_i[6]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+
+// J14.
 IO_LOC "cam_rst_n_o" P9;
 IO_PORT "cam_rst_n_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_scl_io" T6;
-IO_PORT "cam_scl_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
-IO_LOC "cam_sda_io" P6;
-IO_PORT "cam_sda_io" IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_pwdn_o" T9;
+IO_PORT "cam_pwdn_o" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[5]" T8;
+IO_PORT "cam_data_i[5]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[4]" P8;
+IO_PORT "cam_data_i[4]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[3]" R8;
+IO_PORT "cam_data_i[3]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_pclk_i" T7;
+IO_PORT "cam_pclk_i" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[1]" T6;
+IO_PORT "cam_data_i[1]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
+IO_LOC "cam_data_i[0]" P6;
+IO_PORT "cam_data_i[0]" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 
 // Светодиоды дока по шелкографии: LED2 — N16, LED3 — N14, LED4 — L14, LED5 — L16 (горят при 0).
 IO_LOC "led_n_o[0]" N16;
