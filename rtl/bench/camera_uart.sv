@@ -73,11 +73,14 @@ module camera_uart #(
   // =========================================================================================
   logic [NumStages-1:0] stage_en_q;
   logic [NumStages*SelW-1:0] kernel_sel_q;
-  // Запрос кадра — рукопожатие в четыре фазы уровнями, а не импульсами: req_q = 1 — нужен кадр,
-  // served = 1 — кадр захвачен; каждый уровень меняется, только когда другой домен увидел
-  // предыдущее значение. Остановленный PCLK (камера не работает) ничего не теряет: домен PCLK
-  // видит последнее состояние запроса, когда такты возобновятся.
+  // Запрос кадра — рукопожатие уровнями, а не импульсами: req_q = 1 — нужен кадр; домен PCLK
+  // отвечает уровнями ack (видит запрос) и served (кадр захвачен). Новый запрос поднимается,
+  // только когда домен PCLK подтвердил снятие предыдущего (ack = 0, served = 0): так он
+  // прерывает старый захват до начала нового, даже если запрос сняли и снова подняли, пока PCLK
+  // стоял (камера не работала). Остановленный PCLK ничего не теряет: домен PCLK видит последнее
+  // состояние запроса, когда такты возобновятся.
   logic req_q;
+  logic ack;  // ack_q домена PCLK, пересчитанный в домен clk_i
   logic served;  // served_q домена PCLK, пересчитанный в домен clk_i
   logic frame_pulse;  // начало кадра камеры (импульс из домена PCLK)
 
@@ -212,15 +215,15 @@ module camera_uart #(
           end
         end
 
-        // Запрос поднимается, когда домен PCLK снял served прошлого запроса, и снимается, когда
-        // кадр захвачен или ожидание отменено (любым байтом; захват в домене PCLK тоже
+        // Запрос поднимается, когда домен PCLK подтвердил снятие прошлого запроса, и снимается,
+        // когда кадр захвачен или ожидание отменено (любым байтом; захват в домене PCLK тоже
         // прерывается).
         WaitFrame: begin
           if (rx_valid) begin
             req_q   <= 1'b0;
             state_q <= Idle;
           end else if (!req_q) begin
-            if (!served) req_q <= 1'b1;
+            if (!ack && !served) req_q <= 1'b1;
           end else if (served) begin
             req_q      <= 1'b0;
             rd_addr_q  <= '0;
@@ -323,7 +326,7 @@ module camera_uart #(
   // захвата серого кадра — это его результат. Захват идёт, только пока поднят запрос, и
   // прерывается, если запрос сняли: так буферы пишет только захват, которого ждёт домен clk_i, и
   // он читает их после served, когда запись закончена.
-  logic raw_on_q, out_wait_q, out_on_q, served_q;
+  logic raw_on_q, out_wait_q, out_on_q, ack_q, served_q;
   logic [AddrW-1:0] raw_cnt_q, out_cnt_q;
   logic raw_start, out_start, raw_we, out_we;
   logic frame_tgl_q;
@@ -339,12 +342,14 @@ module camera_uart #(
       raw_on_q    <= 1'b0;
       out_wait_q  <= 1'b0;
       out_on_q    <= 1'b0;
+      ack_q       <= 1'b0;
       served_q    <= 1'b0;
       raw_cnt_q   <= '0;
       out_cnt_q   <= '0;
       frame_tgl_q <= 1'b0;
     end else begin
       if (gray_valid && gray_sof) frame_tgl_q <= ~frame_tgl_q;
+      ack_q <= req_pclk;
 
       if (raw_start) begin
         raw_on_q   <= 1'b1;
@@ -367,7 +372,8 @@ module camera_uart #(
         out_cnt_q <= out_cnt_q + 1'b1;
       end
 
-      // Запрос снят: захват прерывается (отмена), served снимается (конец рукопожатия).
+      // Запрос снят: захват прерывается (отмена), served снимается (конец рукопожатия) — в том
+      // же такте, что и ack_q, поэтому ack = 0 в домене clk_i значит, что старого захвата нет.
       if (!req_pclk) begin
         raw_on_q   <= 1'b0;
         out_wait_q <= 1'b0;
@@ -378,6 +384,12 @@ module camera_uart #(
   end
 
   assign frame_o = frame_tgl_q;
+
+  level_sync u_ack_sync (
+      .clk_i(clk_i),
+      .d_i  (ack_q),
+      .q_o  (ack)
+  );
 
   level_sync u_served_sync (
       .clk_i(clk_i),

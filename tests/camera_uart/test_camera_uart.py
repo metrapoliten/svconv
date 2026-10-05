@@ -159,6 +159,45 @@ async def request_survives_stopped_pclk(dut):
     check(raw, out, frames, ["identity"] * 3, [True] * 3)
 
 
+@cocotb.test()
+async def cancel_of_started_capture_survives_stopped_pclk(dut):
+    """Захват уже начался, и PCLK остановился посреди кадра (камера отключилась). Отмена, новая
+    настройка и новый запрос, затем PCLK возобновляется: старый захват должен прерваться, а
+    ответ — быть целым кадром, посчитанным новой цепочкой."""
+    pclk = Clock(dut.pclk_i, PCLK_NS, unit="ns")
+    pclk.start()
+    cocotb.start_soon(Clock(dut.clk_i, CLK_NS, unit="ns").start())
+    dut.uart_rx_i.value = 1
+    dut.cam_vsync_i.value = 0
+    dut.cam_href_i.value = 0
+    dut.cam_data_i.value = 0
+    dut.rst_i.value = 1
+    dut.rst_pclk_i.value = 1
+    await ClockCycles(dut.clk_i, 3)
+    await ClockCycles(dut.pclk_i, 3)
+    dut.rst_i.value = 0
+    dut.rst_pclk_i.value = 0
+    rng = np.random.default_rng(9)
+    frames = [rng.integers(0, 1 << 16, (CAM_H, CAM_W), dtype=np.uint16) for _ in range(8)]
+    cocotb.start_soon(dvp_camera(dut, frames, H_BLANK, V_BLANK, VSYNC_LEN))
+    # Цепочка по умолчанию; запрос кадра, захват начинается.
+    await uart_send(dut, dut.uart_rx_i, b"f", CLKS_PER_BIT)
+    while dut.raw_on_q.value != 1:
+        await RisingEdge(dut.pclk_i)
+    await ClockCycles(dut.pclk_i, 8 * (2 * CAM_W + H_BLANK))
+    pclk.stop()
+    await uart_send(dut, dut.uart_rx_i, b"x", CLKS_PER_BIT)
+    edges = (["gauss5", "gauss5", "log5"], [False, False, True])
+    await configure(dut, *edges)
+    await uart_send(dut, dut.uart_rx_i, b"f", CLKS_PER_BIT)
+    await ClockCycles(dut.clk_i, 50)
+    pclk.start()
+    data = await uart_recv(dut, dut.uart_tx_o, 2 * W * H, CLKS_PER_BIT, timeout_bits=5000)
+    raw = np.frombuffer(data[: W * H], dtype=np.uint8).reshape(H, W)
+    out = np.frombuffer(data[W * H :], dtype=np.uint8).reshape(H, W)
+    check(raw, out, frames, *edges)
+
+
 # Тайм-аут незавершённой команды стенда (параметр CmdTimeoutBits) с запасом.
 CMD_TIMEOUT_CYCLES = 1000 * CLKS_PER_BIT + 10 * CLKS_PER_BIT
 
