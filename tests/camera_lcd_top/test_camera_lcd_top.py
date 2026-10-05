@@ -6,11 +6,10 @@ PLL Gowin (35 МГц для дисплея, 25 МГц для XCLK), запуск
 
 import cocotb
 import numpy as np
-from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
 from svconv_model import KERNELS, display_frame, pipeline, rgb565_to_rgb888, rgb888_to_gray
-from svconv_tb import capture_screen, dvp_camera, ov7670_power_up
+from svconv_tb import capture_screen, dvp_camera, ov7670_power_up, start_camera_lcd_top
 
 CAM_W, CAM_H = 640, 480
 SCREEN = (800, 480)
@@ -30,15 +29,7 @@ async def measure_period_ns(clk, cycles: int = 100) -> float:
 
 @cocotb.test()
 async def camera_frame_on_screen(dut):
-    cocotb.start_soon(Clock(dut.clk50_i, 20, unit="ns").start())
-    # PCLK камеры — 25 МГц, как XCLK от PLL (у OV7670 без делителя PCLK = XCLK); фронты сдвинуты
-    # относительно clk50 на задержку проводов и камеры.
-    await Timer(7, unit="ns")
-    cocotb.start_soon(Clock(dut.cam_pclk_i, 40, unit="ns").start())
-    dut.btn_n_i.value = 1
-    dut.cam_vsync_i.value = 0
-    dut.cam_href_i.value = 0
-    dut.cam_data_i.value = 0
+    await start_camera_lcd_top(dut)
     await Timer(2, unit="us")
 
     # PLL: частоты из настроек (CLKOUT0 — дисплей, CLKOUT1 — XCLK камеры).

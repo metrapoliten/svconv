@@ -9,11 +9,10 @@ import os
 
 import cocotb
 import numpy as np
-from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, RisingEdge, Timer, with_timeout
+from cocotb.triggers import ClockCycles, RisingEdge, with_timeout
 
 from svconv_model import KERNEL_ROM_ORDER, KERNELS, pipeline, rgb565_to_rgb888, rgb888_to_gray
-from svconv_tb import dvp_camera, ov7670_power_up
+from svconv_tb import dvp_camera, ov7670_power_up, start_camera_lcd_top
 
 CAM_W = int(os.environ["CAM_WIDTH"])
 CAM_H = int(os.environ["CAM_HEIGHT"])
@@ -106,13 +105,7 @@ async def check_mode(dut, mode: int, gray: np.ndarray, frame_ns: int) -> None:
 
 @cocotb.test()
 async def modes_switch_on_running_camera(dut):
-    cocotb.start_soon(Clock(dut.clk50_i, 20, unit="ns").start())
-    await Timer(7, unit="ns")
-    cocotb.start_soon(Clock(dut.cam_pclk_i, 40, unit="ns").start())
-    dut.btn_n_i.value = 1
-    dut.cam_vsync_i.value = 0
-    dut.cam_href_i.value = 0
-    dut.cam_data_i.value = 0
+    await start_camera_lcd_top(dut)
 
     await ov7670_power_up(dut, dut.clk50_i)
     rgb565 = np.random.default_rng(2).integers(0, 1 << 16, (CAM_H, CAM_W), dtype=np.uint16)

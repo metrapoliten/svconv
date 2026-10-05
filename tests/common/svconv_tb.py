@@ -9,7 +9,15 @@ import random
 import cocotb
 import numpy as np
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, FallingEdge, First, ReadOnly, RisingEdge, with_timeout
+from cocotb.triggers import (
+    ClockCycles,
+    FallingEdge,
+    First,
+    ReadOnly,
+    RisingEdge,
+    Timer,
+    with_timeout,
+)
 
 # Значение неопределённого (X/Z) выходного пикселя.
 UNDEFINED = -1
@@ -99,6 +107,19 @@ def unpack_weights(value: int, k: int) -> np.ndarray:
     """Обратное к pack_weights: вектор весов -> знаковая матрица K×K."""
     raw = [(value >> (8 * idx)) & 0xFF for idx in range(k * k)]
     return np.array([b - 256 if b > 127 else b for b in raw]).reshape(k, k)
+
+
+async def start_camera_lcd_top(dut) -> None:
+    """Запуск в тестах camera_lcd_top: генератор 50 МГц и PCLK камеры 25 МГц (как XCLK от PLL; у
+    OV7670 без делителя PCLK = XCLK), фронты PCLK сдвинуты на задержку проводов и камеры. Кнопка
+    отпущена, камера молчит."""
+    cocotb.start_soon(Clock(dut.clk50_i, 20, unit="ns").start())
+    await Timer(7, unit="ns")
+    cocotb.start_soon(Clock(dut.cam_pclk_i, 40, unit="ns").start())
+    dut.btn_n_i.value = 1
+    dut.cam_vsync_i.value = 0
+    dut.cam_href_i.value = 0
+    dut.cam_data_i.value = 0
 
 
 async def capture_screen(
