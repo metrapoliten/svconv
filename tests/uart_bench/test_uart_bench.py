@@ -4,7 +4,7 @@ import os
 
 import cocotb
 import numpy as np
-from cocotb.triggers import ClockCycles
+from cocotb.triggers import ClockCycles, FallingEdge, RisingEdge
 
 from svconv_model import KERNEL_ROM_ORDER, KERNELS, pad_kernel, pipeline, sample_image
 from svconv_tb import assert_frames_equal, start_clock, uart_recv, uart_send
@@ -118,3 +118,24 @@ async def nonexistent_kernel_is_rejected(dut):
     await configure(dut, *edges)
     await uart_send(dut, dut.uart_rx_i, bytes([ord("c"), 0b111, 3]), CLKS_PER_BIT)
     assert_frames_equal(await request_frame(dut), expected(*edges), "after invalid command")
+
+
+@cocotb.test()
+async def command_during_last_reply_byte_is_ignored(dut):
+    """Пока передаётся последний байт ответа, стенд занят (busy_o = 1) и новую команду
+    игнорирует; после ответа снова принимает команды."""
+    await setup(dut)
+    await uart_send(dut, dut.uart_rx_i, b"p", CLKS_PER_BIT)
+    await uart_recv(dut, dut.uart_tx_o, 2, CLKS_PER_BIT)
+    # Команда, начатая со старт-битом третьего байта ответа, принимается (по её стоп-биту) в
+    # начале четвёртого, последнего: в этот момент автомат уже в Idle, но передатчик занят.
+    await FallingEdge(dut.uart_tx_o)
+    cocotb.start_soon(uart_send(dut, dut.uart_rx_i, b"p", CLKS_PER_BIT))
+    await uart_recv(dut, dut.uart_tx_o, 1, CLKS_PER_BIT)
+    assert dut.busy_o.value == 1, "busy_o is 0 while the last reply byte is being sent"
+    await uart_recv(dut, dut.uart_tx_o, 1, CLKS_PER_BIT)
+    for _ in range(40 * CLKS_PER_BIT):
+        await RisingEdge(dut.clk_i)
+        assert dut.uart_tx_o.value == 1, "a command received during the last reply byte was run"
+    await uart_send(dut, dut.uart_rx_i, b"p", CLKS_PER_BIT)
+    await uart_recv(dut, dut.uart_tx_o, 4, CLKS_PER_BIT)
