@@ -95,30 +95,36 @@ def unpack_weights(value: int, k: int) -> np.ndarray:
     return np.array([b - 256 if b > 127 else b for b in raw]).reshape(k, k)
 
 
-async def uart_send(dut, line, data: bytes, clks_per_bit: int) -> None:
-    """Передаёт байты по линии line (8N1), длина бита — clks_per_bit тактов dut.clk_i."""
+async def uart_send(dut, line, data: bytes, clks_per_bit: int, clk=None) -> None:
+    """Передаёт байты по линии line (8N1), длина бита — clks_per_bit тактов clk (по умолчанию
+    dut.clk_i)."""
+    clk = dut.clk_i if clk is None else clk
     for byte in data:
         for bit in [0] + [(byte >> i) & 1 for i in range(8)] + [1]:
             line.value = bit
-            await ClockCycles(dut.clk_i, clks_per_bit)
+            await ClockCycles(clk, clks_per_bit)
 
 
-async def uart_recv(dut, line, count: int, clks_per_bit: int, timeout_bits: int = 1000) -> bytes:
-    """Принимает count байт с линии line (8N1), выбирая биты в их серединах."""
+async def uart_recv(
+    dut, line, count: int, clks_per_bit: int, timeout_bits: int = 1000, clk=None
+) -> bytes:
+    """Принимает count байт с линии line (8N1), выбирая биты в их серединах; clk — такт, в
+    котором задана длина бита (по умолчанию dut.clk_i)."""
+    clk = dut.clk_i if clk is None else clk
     out = bytearray()
     for _ in range(count):
         idle = 0
         while line.value == 1:
-            await RisingEdge(dut.clk_i)
+            await RisingEdge(clk)
             idle += 1
             assert idle < timeout_bits * clks_per_bit, f"UART: no start bit, got {len(out)} bytes"
-        await ClockCycles(dut.clk_i, clks_per_bit // 2)
+        await ClockCycles(clk, clks_per_bit // 2)
         assert line.value == 0, "UART: start bit too short"
         byte = 0
         for i in range(8):
-            await ClockCycles(dut.clk_i, clks_per_bit)
+            await ClockCycles(clk, clks_per_bit)
             byte |= int(line.value) << i
-        await ClockCycles(dut.clk_i, clks_per_bit)
+        await ClockCycles(clk, clks_per_bit)
         assert line.value == 1, "UART: no stop bit"
         out.append(byte)
     return bytes(out)
@@ -130,20 +136,23 @@ async def dvp_camera(
     h_blank: int = 20,
     v_blank: int = 50,
     vsync_len: int = 10,
+    pclk=None,
 ) -> None:
-    """Модель камеры DVP (сигналы dut.pclk_i, cam_vsync_i, cam_href_i, cam_data_i): для каждого
-    кадра RGB565 — импульс VSYNC, затем строки с HREF, пиксель — два байта, старший первым.
-    Данные меняются после фронта PCLK и выбираются ПЛИС на следующем фронте."""
+    """Модель камеры DVP (сигналы PCLK — pclk, по умолчанию dut.pclk_i, — и dut.cam_vsync_i,
+    cam_href_i, cam_data_i): для каждого кадра RGB565 — импульс VSYNC, затем строки с HREF,
+    пиксель — два байта, старший первым. Данные меняются после фронта PCLK и выбираются ПЛИС
+    на следующем фронте."""
+    pclk = dut.pclk_i if pclk is None else pclk
     for frame in frames:
         dut.cam_vsync_i.value = 1
-        await ClockCycles(dut.pclk_i, vsync_len)
+        await ClockCycles(pclk, vsync_len)
         dut.cam_vsync_i.value = 0
-        await ClockCycles(dut.pclk_i, v_blank)
+        await ClockCycles(pclk, v_blank)
         for row in frame:
             dut.cam_href_i.value = 1
             for pixel in row:
                 for byte in (int(pixel) >> 8, int(pixel) & 0xFF):
                     dut.cam_data_i.value = byte
-                    await RisingEdge(dut.pclk_i)
+                    await RisingEdge(pclk)
             dut.cam_href_i.value = 0
-            await ClockCycles(dut.pclk_i, h_blank)
+            await ClockCycles(pclk, h_blank)
