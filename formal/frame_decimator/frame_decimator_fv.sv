@@ -8,7 +8,9 @@
 // Пиксели подаются каждый такт: состояние модуля меняется только по valid_i, поэтому такты
 // без пикселя на результат не влияют (работа с паузами проверяется тестами cocotb). Кадр
 // входа — InWidth×InHeight, больше, чем Factor*OutWidth × Factor*OutHeight, чтобы проверялось
-// и отбрасывание лишнего.
+// и отбрасывание лишнего. Он настолько велик (> Factor * 2^XW, где XW — разрядность счётчика x
+// внутри модуля), что без остановки счётчиков x и y на OutWidth/OutHeight они бы переполнились
+// и выдали лишние пиксели — так проверяется и эта защита.
 module frame_decimator_fv (
     input logic clk_i,
     input logic rst_i,
@@ -17,14 +19,14 @@ module frame_decimator_fv (
 );
 
   localparam int unsigned Factor  = 2, OutWidth = 2, OutHeight = 2;
-  localparam int unsigned InWidth = 5, InHeight = 5;
+  localparam int unsigned InWidth = 9, InHeight = 9;
 
   logic init_q = 1'b1;
   always_ff @(posedge clk_i) init_q <= 1'b0;
   always_comb assume (rst_i == init_q);
 
   // Позиция текущего входного пикселя; restart_i начинает кадр заново с текущего пикселя.
-  logic [2:0] ix_q = '0, iy_q = '0, ix, iy;
+  logic [3:0] ix_q = '0, iy_q = '0, ix, iy;
   logic sof, sol;
 
   always_comb begin
@@ -38,9 +40,9 @@ module frame_decimator_fv (
     if (rst_i) begin
       ix_q <= '0;
       iy_q <= '0;
-    end else if (ix == 3'(InWidth - 1)) begin
+    end else if (ix == 4'(InWidth - 1)) begin
       ix_q <= '0;
-      iy_q <= (iy == 3'(InHeight - 1)) ? '0 : iy + 1'b1;
+      iy_q <= (iy == 4'(InHeight - 1)) ? '0 : iy + 1'b1;
     end else begin
       ix_q <= ix + 1'b1;
       iy_q <= iy;
