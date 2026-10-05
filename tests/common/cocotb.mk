@@ -5,6 +5,12 @@
 #   make test           — пересобрать и прогнать тесты
 #   make test WAVES=1   — с записью временных диаграмм (sim_build/*.fst)
 
+# Окружение Python проекта (.venv), если оно есть, — первым в PATH, как в корневом Makefile:
+# так находятся cocotb, NumPy и Pillow без ручной активации.
+ifneq ($(wildcard $(ROOT)/.venv/bin),)
+export PATH := $(ROOT)/.venv/bin:$(PATH)
+endif
+
 SIM           ?= icarus
 TOPLEVEL_LANG := verilog
 
