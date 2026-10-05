@@ -112,6 +112,18 @@ async def uart_send(dut, line, data: bytes, clks_per_bit: int, clk=None) -> None
             await ClockCycles(clk, clks_per_bit)
 
 
+async def wait_start_bit(
+    dut, line, clks_per_bit: int, timeout_bits: int = 1000, clk=None, what: str = ""
+) -> None:
+    """Ждёт старт-бит (линия в 0) не дольше timeout_bits бит; what дополняет сообщение об ошибке."""
+    clk = dut.clk_i if clk is None else clk
+    idle = 0
+    while line.value == 1:
+        await RisingEdge(clk)
+        idle += 1
+        assert idle < timeout_bits * clks_per_bit, f"UART: no start bit{what}"
+
+
 async def uart_recv(
     dut, line, count: int, clks_per_bit: int, timeout_bits: int = 1000, clk=None
 ) -> bytes:
@@ -120,11 +132,7 @@ async def uart_recv(
     clk = dut.clk_i if clk is None else clk
     out = bytearray()
     for _ in range(count):
-        idle = 0
-        while line.value == 1:
-            await RisingEdge(clk)
-            idle += 1
-            assert idle < timeout_bits * clks_per_bit, f"UART: no start bit, got {len(out)} bytes"
+        await wait_start_bit(dut, line, clks_per_bit, timeout_bits, clk, f", got {len(out)} bytes")
         await ClockCycles(clk, clks_per_bit // 2)
         assert line.value == 0, "UART: start bit too short"
         byte = 0

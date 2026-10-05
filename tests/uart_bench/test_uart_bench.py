@@ -4,10 +4,10 @@ import os
 
 import cocotb
 import numpy as np
-from cocotb.triggers import ClockCycles, FallingEdge, RisingEdge
+from cocotb.triggers import ClockCycles, RisingEdge
 
 from svconv_model import KERNEL_ROM_ORDER, KERNELS, pad_kernel, pipeline, sample_image
-from svconv_tb import assert_frames_equal, start_clock, uart_recv, uart_send
+from svconv_tb import assert_frames_equal, start_clock, uart_recv, uart_send, wait_start_bit
 
 WIDTH = int(os.environ["WIDTH"])
 HEIGHT = int(os.environ["HEIGHT"])
@@ -129,7 +129,8 @@ async def command_during_last_reply_byte_is_ignored(dut):
     await uart_recv(dut, dut.uart_tx_o, 2, CLKS_PER_BIT)
     # Команда, начатая со старт-битом третьего байта ответа, принимается (по её стоп-биту) в
     # начале четвёртого, последнего: в этот момент автомат уже в Idle, но передатчик занят.
-    await FallingEdge(dut.uart_tx_o)
+    # Третий байт идёт сразу за вторым: старт-бит — примерно через полбита после выборки стоп-бита.
+    await wait_start_bit(dut, dut.uart_tx_o, CLKS_PER_BIT, 2, what=" of the third reply byte")
     cocotb.start_soon(uart_send(dut, dut.uart_rx_i, b"p", CLKS_PER_BIT))
     await uart_recv(dut, dut.uart_tx_o, 1, CLKS_PER_BIT)
     assert dut.busy_o.value == 1, "busy_o is 0 while the last reply byte is being sent"

@@ -28,6 +28,8 @@ from svconv_model import (  # noqa: E402
 from uart_link import resync  # noqa: E402
 
 WIDTH, HEIGHT, K, NUM_STAGES = 160, 120, 5, 3
+# Генератор стенда выдаёт пиксель каждый такт без гашения, поэтому кадр идёт ровно W*H тактов.
+EXPECTED_PERIOD = WIDTH * HEIGHT
 SEL_W = max(1, (len(KERNEL_ROM_ORDER) - 1).bit_length())
 
 
@@ -47,6 +49,17 @@ def parse_chain(text: str) -> tuple[list[str], list[bool]]:
         else:
             raise SystemExit(f"unknown kernel {name!r}, available: {', '.join(KERNEL_ROM_ORDER)}")
     return kernels, enabled
+
+
+def check(frame: np.ndarray, expected: np.ndarray, period: int) -> list[str]:
+    """Сверяет результат с ожидаемым; возвращает список расхождений (пустой — всё верно)."""
+    problems = []
+    mismatches = int((frame != expected).sum())
+    if mismatches:
+        problems.append(f"{mismatches} of {frame.size} pixels differ from the model")
+    if period != EXPECTED_PERIOD:
+        problems.append(f"frame period is {period} cycles, expected {EXPECTED_PERIOD}")
+    return problems
 
 
 def read_exact(port: serial.Serial, count: int) -> bytes:
@@ -84,18 +97,22 @@ def main() -> None:
     frame = frame.reshape(HEIGHT, WIDTH)
     chain = [pad_kernel(KERNELS[n], K) for n, e in zip(kernels, enabled) if e]
     expected = pipeline(sample_image(WIDTH, HEIGHT), chain)
-    mismatches = int((frame != expected).sum())
+    problems = check(frame, expected, period)
 
     print(f"chain: {args.chain}")
     print(f"frame received in {elapsed:.2f} s")
     print(f"frame period: {period} cycles ({period / (WIDTH * HEIGHT):.3f} cycles per pixel)")
-    print(f"mismatches with the model: {mismatches} of {WIDTH * HEIGHT}")
+    print(f"mismatches with the model: {int((frame != expected).sum())} of {WIDTH * HEIGHT}")
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
         Image.fromarray(frame).save(args.out / "received.png")
         Image.fromarray(expected).save(args.out / "expected.png")
         print(f"images saved to {args.out}")
-    sys.exit(0 if mismatches == 0 else 1)
+    for problem in problems:
+        print(f"FAIL: {problem}")
+    if not problems:
+        print("PASS")
+    sys.exit(1 if problems else 0)
 
 
 if __name__ == "__main__":
