@@ -139,10 +139,9 @@ module ov7670_init #(
 
   typedef enum logic [2:0] {
     HwReset,
-    HwWait,
+    ResetWait,  // пауза после аппаратного и после программного сброса
     Write,
     WaitDone,
-    SoftResetWait,
     Done
   } state_e;
 
@@ -185,10 +184,10 @@ module ov7670_init #(
           delay_q <= delay_q + 1'b1;
           if (delay_q == DelayW'(ResetClks - 1)) begin
             delay_q <= '0;
-            state_q <= HwWait;
+            state_q <= ResetWait;
           end
         end
-        HwWait: begin
+        ResetWait: begin
           delay_q <= delay_q + 1'b1;
           if (delay_q == DelayW'(WaitClks - 1)) begin
             delay_q <= '0;
@@ -201,16 +200,9 @@ module ov7670_init #(
           if (sccb_ready) begin
             idx_q <= idx_q + 1'b1;
             // После программного сброса (запись 0: COM7 = 0x80) нужна пауза.
-            if (idx_q == '0) state_q <= SoftResetWait;
+            if (idx_q == '0) state_q <= ResetWait;
             else if (idx_q == 7'(NumRegs - 1)) state_q <= Done;
             else state_q <= Write;
-          end
-        end
-        SoftResetWait: begin
-          delay_q <= delay_q + 1'b1;
-          if (delay_q == DelayW'(WaitClks - 1)) begin
-            delay_q <= '0;
-            state_q <= Write;
           end
         end
         Done: ;
