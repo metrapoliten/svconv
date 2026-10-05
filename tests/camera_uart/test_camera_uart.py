@@ -104,7 +104,8 @@ async def reports_frame_period(dut):
 
 @cocotb.test()
 async def capture_can_be_cancelled(dut):
-    """Без камеры кадр не приходит; любой байт отменяет ожидание, и стенд снова принимает команды."""
+    """Без камеры кадр не приходит; любой байт отменяет ожидание (и захват в домене PCLK), и
+    стенд снова принимает команды."""
     cocotb.start_soon(Clock(dut.pclk_i, PCLK_NS, unit="ns").start())
     cocotb.start_soon(Clock(dut.clk_i, CLK_NS, unit="ns").start())
     dut.uart_rx_i.value = 1
@@ -122,6 +123,8 @@ async def capture_can_be_cancelled(dut):
     await uart_send(dut, dut.uart_rx_i, b"x", CLKS_PER_BIT)
     await ClockCycles(dut.clk_i, 20)
     assert dut.busy_o.value == 0
+    # Отмена снимает и захват в домене PCLK: иначе он сработал бы, когда камера заработает.
+    assert dut.armed_q.value == 0, "the cancelled capture is still armed in the PCLK domain"
     await uart_send(dut, dut.uart_rx_i, b"p", CLKS_PER_BIT)
     period = int.from_bytes(await uart_recv(dut, dut.uart_tx_o, 4, CLKS_PER_BIT), "little")
     assert period == 0, "no camera frames, so the period is unknown (0)"
