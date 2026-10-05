@@ -182,7 +182,7 @@ async def cancel_of_started_capture_survives_stopped_pclk(dut):
     cocotb.start_soon(dvp_camera(dut, frames, H_BLANK, V_BLANK, VSYNC_LEN))
     # Цепочка по умолчанию; запрос кадра, захват начинается.
     await uart_send(dut, dut.uart_rx_i, b"f", CLKS_PER_BIT)
-    while dut.raw_on_q.value != 1:
+    while dut.u_capture.raw_on_q.value != 1:
         await RisingEdge(dut.pclk_i)
     await ClockCycles(dut.pclk_i, 8 * (2 * CAM_W + H_BLANK))
     pclk.stop()

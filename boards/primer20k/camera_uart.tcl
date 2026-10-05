@@ -11,7 +11,7 @@ foreach f {
   core/conv_pipeline.sv core/rgb565_to_gray.sv core/frame_decimator.sv
   video/frame_buffer.sv
   camera/sccb_writer.sv camera/ov7670_init.sv camera/dvp_capture.sv camera/camera_pipeline.sv
-  bench/camera_uart.sv
+  bench/capture_ctrl.sv bench/camera_uart.sv
 } {
   add_file "$rtl_dir/$f"
 }

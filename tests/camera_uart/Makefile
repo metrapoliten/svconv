@@ -13,7 +13,7 @@ VERILOG_SOURCES := $(addprefix $(ROOT)/rtl/, \
                      core/sdp_ram.sv core/kernel_rom.sv core/conv_postprocess.sv core/conv2d_stage.sv \
                      core/conv_pipeline.sv core/rgb565_to_gray.sv core/frame_decimator.sv \
                      video/frame_buffer.sv camera/dvp_capture.sv camera/camera_pipeline.sv \
-                     bench/camera_uart.sv)
+                     bench/capture_ctrl.sv bench/camera_uart.sv)
 COCOTB_TOPLEVEL     := camera_uart
 COCOTB_TEST_MODULES := test_camera_uart
 COMPILE_ARGS += -Pcamera_uart.Width=16 -Pcamera_uart.Height=12 -Pcamera_uart.Factor=4 \

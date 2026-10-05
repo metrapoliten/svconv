@@ -13,7 +13,7 @@ VERILOG_SOURCES := $(addprefix $(ROOT)/rtl/, \
                      core/sdp_ram.sv core/conv_postprocess.sv core/conv2d_stage.sv core/kernel_rom.sv core/conv_pipeline.sv \
                      core/rgb565_to_gray.sv core/frame_decimator.sv video/frame_buffer.sv \
                      camera/sccb_writer.sv camera/ov7670_init.sv camera/dvp_capture.sv camera/camera_pipeline.sv \
-                     bench/camera_uart.sv) \
+                     bench/capture_ctrl.sv bench/camera_uart.sv) \
                    $(ROOT)/boards/primer20k/camera_uart_top.sv
 COCOTB_TOPLEVEL     := camera_uart_top
 COCOTB_TEST_MODULES := test_camera_uart_top
