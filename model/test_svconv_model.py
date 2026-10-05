@@ -71,12 +71,23 @@ def test_edge_detector_zero_on_constant_image() -> None:
     assert not out[p:-p, p:-p].any()
 
 
-@pytest.mark.parametrize("name", list(KERNELS))
+@pytest.mark.parametrize("name", [n for n, k in KERNELS.items() if k.mode == "clamp"])
 def test_no_saturation_by_construction(name: str) -> None:
-    """Сдвиги подобраны так, что даже худший случай помещается в 0..255 без насыщения."""
+    """У размытий и тождественного ядра даже худший случай помещается в 0..255 без насыщения
+    (у детектора границ насыщение на самых резких краях допускается, см. KERNELS)."""
     w = KERNELS[name].weights.astype(np.int64)
     worst = max(255 * w[w > 0].sum(), -255 * w[w < 0].sum())
     assert (worst + (1 << KERNELS[name].shift >> 1)) >> KERNELS[name].shift <= 255
+
+
+@pytest.mark.parametrize("name", list(KERNELS))
+def test_kernel_fits_hardware(name: str) -> None:
+    """Веса — 8 бит со знаком (ПЗУ ядер), худшая сумма помещается в сумматор каскада: 17-битные
+    произведения плюс $clog2(K*K) бит (conv2d_stage.sv, AccW) для окна 5×5 — 22 бита со знаком."""
+    w = KERNELS[name].weights.astype(np.int64)
+    assert w.min() >= -128 and w.max() <= 127
+    worst = max(255 * w[w > 0].sum(), -255 * w[w < 0].sum())
+    assert worst < 1 << 21
 
 
 def test_postprocess_rounding_and_clamp() -> None:
