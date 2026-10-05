@@ -19,6 +19,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "model"))
 
 from svconv_model import KERNEL_ROM_ORDER, KERNELS, pad_kernel, pipeline  # noqa: E402
+from uart_link import resync  # noqa: E402
 
 WIDTH, HEIGHT, K, NUM_STAGES = 160, 120, 5, 3
 CLK_FREQ = 27_000_000
@@ -71,7 +72,7 @@ def main() -> None:
 
     # Два кадра по 19200 байт на 115200 бод идут ~3,4 с; ждём с запасом.
     with serial.Serial(args.port, args.baud, timeout=10) as port:
-        port.reset_input_buffer()
+        resync(port)
         port.write(b"p")
         period = int.from_bytes(read_exact(port, 4), "little")
         port.write(bytes([ord("c"), en, sel]))

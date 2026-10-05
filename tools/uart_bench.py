@@ -25,6 +25,7 @@ from svconv_model import (  # noqa: E402
     pipeline,
     sample_image,
 )
+from uart_link import resync  # noqa: E402
 
 WIDTH, HEIGHT, K, NUM_STAGES = 160, 120, 5, 3
 SEL_W = max(1, (len(KERNEL_ROM_ORDER) - 1).bit_length())
@@ -71,7 +72,7 @@ def main() -> None:
 
     # Кадр 19200 байт на 115200 бод идёт ~1,7 с.
     with serial.Serial(args.port, args.baud, timeout=5) as port:
-        port.reset_input_buffer()
+        resync(port)
         port.write(bytes([ord("c"), en, sel]))
         start = time.monotonic()
         port.write(b"f")
