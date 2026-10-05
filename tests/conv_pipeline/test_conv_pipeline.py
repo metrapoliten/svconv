@@ -115,13 +115,16 @@ async def ready_waits_for_every_stage(dut):
 @cocotb.test()
 async def clean_frame_after_reconfiguration(dut):
     """Контракт из описания conv_pipeline: после смены конфигурации посреди непрерывного потока
-    выходной кадр, начавшийся со второго sof_o после ready_o, целиком вычислен новой
-    конфигурацией (кадры вокруг смены могут быть смешанными)."""
+    выходной кадр, начавшийся первым после второго sof_i, пришедшего после смены при ready_o,
+    целиком вычислен новой конфигурацией (кадры вокруг смены могут быть смешанными). Среди смен —
+    включение и выключение сразу нескольких каскадов: каждый из них может выдать лишний sof_o."""
     start_clock(dut)
     configs = [
         (["gauss5", "gauss5", "log5"], [True, True, True]),
         (["gauss5", "identity", "log5"], [True, False, True]),
         (["log5", "gauss5", "identity"], [True, True, False]),
+        # Из предыдущей выключаются два каскада, в следующую (первую) включаются все три.
+        (["gauss5", "gauss5", "log5"], [False, False, False]),
     ]
 
     def apply(cfg) -> None:
@@ -135,7 +138,7 @@ async def clean_frame_after_reconfiguration(dut):
     np_rng = np.random.default_rng(9)
     num_changes = 8
     frames = [
-        np_rng.integers(0, 256, (HEIGHT, WIDTH), dtype=np.uint8) for _ in range(5 * num_changes + 6)
+        np_rng.integers(0, 256, (HEIGHT, WIDTH), dtype=np.uint8) for _ in range(8 * num_changes + 6)
     ]
 
     # Выход с номером такта: (такт, sof, данные); начала входных кадров: (такт, номер кадра).
@@ -192,25 +195,30 @@ async def clean_frame_after_reconfiguration(dut):
         else:
             raise AssertionError(f"change {n}: ready_o not asserted within {4 * K * K} cycles")
         ready_cycle = cycle
-        # Ждём, пока второй после ready_o кадр выйдет целиком (с паузами — до ~3,5 кадров).
-        limit = 5 * frame_cycles
+        # Ждём второй после ready_o sof_i и затем целый выходной кадр, начавшийся первым после
+        # него (с паузами — до ~4,5 кадров).
+        limit = 6 * frame_cycles
+        starts: list[int] = []
         for _ in range(limit):
-            starts = [i for i, (c, s, _) in enumerate(out) if s and c > ready_cycle]
-            if len(starts) >= 2 and len(out) >= starts[1] + WIDTH * HEIGHT:
-                break
+            in_after = [c for c, _ in in_sofs if c > ready_cycle]
+            if len(in_after) >= 2:
+                starts = [i for i, (c, s, _) in enumerate(out) if s and c > in_after[1]]
+                if starts and len(out) >= starts[0] + WIDTH * HEIGHT:
+                    break
             await RisingEdge(dut.clk_i)
         else:
             raise AssertionError(
-                f"change {n}: within {limit} cycles after ready_o got {len(starts)} sof_o and "
+                f"change {n}: within {limit} cycles after ready_o got "
+                f"{sum(c > ready_cycle for c, _ in in_sofs)} sof_i and "
                 f"{sum(c > ready_cycle for c, _, _ in out)} output pixels"
             )
-        got = [d for _, _, d in out[starts[1] : starts[1] + WIDTH * HEIGHT]]
+        got = [d for _, _, d in out[starts[0] : starts[0] + WIDTH * HEIGHT]]
         assert UNDEFINED not in got, f"change {n}: undefined pixels inside the checked frame"
         got = np.array(got, dtype=np.uint8)
         got = got.reshape(HEIGHT, WIDTH)
         # Выход отстаёт от входа меньше чем на кадр (HEIGHT > NUM_STAGES * (p + 1)), поэтому
         # выходной кадр — результат входного кадра, который подавался в момент его sof_o.
-        sof_cycle = out[starts[1]][0]
+        sof_cycle = out[starts[0]][0]
         src = max(idx for c, idx in in_sofs if c <= sof_cycle)
         kernels, enabled = cfg
         chain = [pad_kernel(KERNELS[name], K) for name, e in zip(kernels, enabled) if e]
