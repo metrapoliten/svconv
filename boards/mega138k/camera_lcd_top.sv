@@ -232,20 +232,20 @@ module camera_lcd_top #(
 
   assign mode_pclk = {mode_gray_pclk[1], ^mode_gray_pclk};
 
+  // Ядро каждой стадии постоянное — как в режиме 0; режимы различаются только тем, какие
+  // стадии включены (выключенная стадия пропускает кадр без изменений, её ядро не важно),
+  // поэтому кнопка не перезагружает веса ядер.
   // Номера ядер — порядок KERNEL_ROM_ORDER в модели: 0 identity, 1 gauss5, 2 log5.
   localparam int unsigned SelW = 2;
+  localparam logic [3*SelW-1:0] KernelSel = {2'd2, 2'd1, 2'd1};  // стадии 2, 1, 0
   logic [2:0] stage_en;
-  logic [3*SelW-1:0] kernel_sel;
 
   always_comb begin
     unique case (mode_pclk)
-      2'd0:
-      {stage_en, kernel_sel} = {
-        3'b111, 2'd2, 2'd1, 2'd1
-      };  // размытие, размытие, границы
-      2'd1: {stage_en, kernel_sel} = {3'b000, 2'd0, 2'd0, 2'd0};  // без обработки
-      2'd2: {stage_en, kernel_sel} = {3'b001, 2'd0, 2'd0, 2'd1};  // только размытие
-      default: {stage_en, kernel_sel} = {3'b100, 2'd2, 2'd0, 2'd0};  // только границы
+      2'd0: stage_en = 3'b111;  // размытие, размытие, границы
+      2'd1: stage_en = 3'b000;  // без обработки
+      2'd2: stage_en = 3'b001;  // только размытие
+      default: stage_en = 3'b100;  // только границы
     endcase
   end
 
@@ -279,7 +279,7 @@ module camera_lcd_top #(
       .cam_href_i  (cam_href_i),
       .cam_data_i  (cam_data_i),
       .stage_en_i  (stage_en),
-      .kernel_sel_i(kernel_sel),
+      .kernel_sel_i(KernelSel),
       .ready_o     (pipe_ready),
       .frame_o     (frame),
       .lcd_clk_i   (lcd_clk),

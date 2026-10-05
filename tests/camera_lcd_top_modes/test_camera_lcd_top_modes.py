@@ -35,7 +35,8 @@ def led_mode(dut) -> int:
 
 def pipeline_chain(dut) -> list[str]:
     """Цепочка, которую получает обработка в домене PCLK: включённые стадии и номера ядер."""
-    stage_en, kernel_sel = int(dut.stage_en.value), int(dut.kernel_sel.value)
+    stage_en = int(dut.u_display.stage_en_i.value)
+    kernel_sel = int(dut.u_display.kernel_sel_i.value)
     return [
         KERNEL_ROM_ORDER[(kernel_sel >> (2 * s)) & 0b11] if (stage_en >> s) & 1 else "-"
         for s in range(3)
