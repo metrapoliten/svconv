@@ -6,9 +6,10 @@
 #   make camera_uart       — камера на проводах -> свёртки -> кадры по UART (без дисплея)
 #   make load-camera_uart
 #
-# Путь к gw_sh можно переопределить: make GW_SH=/path/to/gw_sh uart_bench
+# Gowin EDA: каталог установки — переменная окружения GOWIN_HOME (в нём bin/gw_sh); без неё
+# gw_sh ищется в PATH. Можно указать и сам gw_sh: make GW_SH=/path/to/gw_sh ...
 
-GW_SH       ?= $(HOME)/dev/fpga_tools/bin/gw_sh
+GW_SH       ?= $(if $(GOWIN_HOME),$(GOWIN_HOME)/bin/gw_sh,gw_sh)
 LOADER      ?= openFPGALoader
 BOARD       := tangprimer20k
 PYTHON      ?= python3

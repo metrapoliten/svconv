@@ -6,9 +6,10 @@
 # Чип по умолчанию — серийный GW5AST-LV138FPG676AC1/I0, версия кристалла B, как в проектах Sipeed для
 # этой платы. Другой: make DEVICE=GW5AST-LV138FPG676AES camera_lcd (инженерная версия) или
 # make DEVICE_VERSION=C camera_lcd.
-# Путь к gw_sh можно переопределить: make GW_SH=/path/to/gw_sh camera_lcd
+# Gowin EDA: каталог установки — переменная окружения GOWIN_HOME (в нём bin/gw_sh); без неё
+# gw_sh ищется в PATH. Можно указать и сам gw_sh: make GW_SH=/path/to/gw_sh ...
 
-GW_SH       ?= $(HOME)/dev/fpga_tools/bin/gw_sh
+GW_SH       ?= $(if $(GOWIN_HOME),$(GOWIN_HOME)/bin/gw_sh,gw_sh)
 LOADER      ?= openFPGALoader
 BOARD       := tangmega138k
 PYTHON      ?= python3

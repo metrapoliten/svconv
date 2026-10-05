@@ -7,7 +7,9 @@
 #                   прошивки в плату
 #   make lint   — линтер verible
 #   make format — проверка форматирования verible (без изменения файлов)
-#   make formal — формальная проверка (SymbiYosys из пакета yowasp-yosys, решатель z3)
+#   make formal — формальная проверка (SymbiYosys, решатель z3): нативный из OSS CAD Suite, если
+#                 задана переменная окружения OSS_CAD_SUITE (каталог распаковки, примерно вдвое
+#                 быстрее), иначе — из пакета yowasp-yosys (requirements.txt)
 
 # Тесты на cocotb и модель используют окружение .venv (см. requirements.txt).
 export PATH := $(CURDIR)/.venv/bin:$(PATH)
@@ -17,9 +19,15 @@ SV_SOURCES := $(shell find rtl boards tests -name '*.sv' 2>/dev/null) $(wildcard
 TOP_TEST_DIRS := $(dir $(wildcard tests/*_top/Makefile tests/*_top_*/Makefile))
 TEST_DIRS  := $(filter-out $(TOP_TEST_DIRS),$(dir $(wildcard tests/*/Makefile)))
 SBY_FILES  ?= $(wildcard formal/*/*.sby)
+# Обёртки в $(OSS_CAD_SUITE)/bin сами находят остальные программы набора (yosys, z3); в PATH
+# набор не добавляется, чтобы не подменять системные iverilog и другие.
+ifneq ($(OSS_CAD_SUITE),)
+SBY        ?= $(OSS_CAD_SUITE)/bin/sby
+else
 # Инструменты YoWASP называются иначе, чем обычные yosys/yosys-smtbmc.
-SBY        := yowasp-sby --yosys yowasp-yosys --smtbmc yowasp-yosys-smtbmc \
+SBY        ?= yowasp-sby --yosys yowasp-yosys --smtbmc yowasp-yosys-smtbmc \
               --witness yowasp-yosys-witness
+endif
 
 .PHONY: test test-top lint format formal clean
 
