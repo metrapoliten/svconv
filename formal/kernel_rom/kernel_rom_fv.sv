@@ -26,8 +26,7 @@ module kernel_rom_fv (
   kernel_rom #(
       .K         (K),
       .NumKernels(NumKernels),
-      .InitFile  ("rom.hex"),
-      .SelW      (2)
+      .InitFile  ("rom.hex")
   ) dut (
       .clk_i    (clk_i),
       .rst_i    (rst_i),

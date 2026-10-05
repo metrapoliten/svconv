@@ -18,12 +18,13 @@ module camera_display #(
     // Нетипизированный: см. conv_pipeline.sv.
     // verilog_lint: waive explicit-parameter-storage-type
     parameter KernelFile = "kernels.hex",
-    parameter int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1,
     // Дисплей (режим DE, см. video_timing).
     parameter int unsigned HActive = 800,
     parameter int unsigned HBlank = 392,
     parameter int unsigned VActive = 480,
-    parameter int unsigned VBlank = 53
+    parameter int unsigned VBlank = 53,
+    // Разрядность номера ядра — определяется числом ядер.
+    localparam int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
 ) (
     // Камера.
     input logic       pclk_i,
@@ -56,8 +57,7 @@ module camera_display #(
       .K         (K),
       .NumStages (NumStages),
       .NumKernels(NumKernels),
-      .KernelFile(KernelFile),
-      .SelW      (SelW)
+      .KernelFile(KernelFile)
   ) u_camera (
       .pclk_i      (pclk_i),
       .rst_i       (rst_pclk_i),

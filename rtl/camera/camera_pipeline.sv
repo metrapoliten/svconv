@@ -14,7 +14,8 @@ module camera_pipeline #(
     // Нетипизированный: см. conv_pipeline.sv.
     // verilog_lint: waive explicit-parameter-storage-type
     parameter KernelFile = "kernels.hex",
-    parameter int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
+    // Разрядность номера ядра — определяется числом ядер.
+    localparam int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
 ) (
     input logic       pclk_i,
     input logic       rst_i,        // синхронный сброс в домене PCLK
@@ -65,8 +66,7 @@ module camera_pipeline #(
       .K         (K),
       .NumStages (NumStages),
       .NumKernels(NumKernels),
-      .KernelFile(KernelFile),
-      .SelW      (SelW)
+      .KernelFile(KernelFile)
   ) u_pipeline (
       .clk_i       (pclk_i),
       .rst_i       (rst_i),

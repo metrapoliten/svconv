@@ -24,7 +24,8 @@ module kernel_rom #(
     // внутри generate (см. conv_pipeline.sv).
     // verilog_lint: waive explicit-parameter-storage-type
     parameter InitFile = "kernels.hex",
-    parameter int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
+    // Разрядность номера ядра — определяется числом ядер.
+    localparam int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
 ) (
     input logic clk_i,
     input logic rst_i,  // синхронный сброс, активный уровень 1

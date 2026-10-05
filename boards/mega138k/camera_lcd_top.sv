@@ -236,7 +236,7 @@ module camera_lcd_top #(
   // стадии включены (выключенная стадия пропускает кадр без изменений, её ядро не важно),
   // поэтому кнопка не перезагружает веса ядер.
   // Номера ядер — порядок KERNEL_ROM_ORDER в модели: 0 identity, 1 gauss5, 2 log5.
-  localparam int unsigned SelW = 2;
+  localparam int unsigned SelW = 2;  // разрядность номера ядра при трёх ядрах (как в conv_pipeline)
   localparam logic [3*SelW-1:0] KernelSel = {2'd2, 2'd1, 2'd1};  // стадии 2, 1, 0
   logic [2:0] stage_en;
 
@@ -261,7 +261,6 @@ module camera_lcd_top #(
       .NumStages (3),
       .NumKernels(3),
       .KernelFile("kernels.hex"),
-      .SelW      (SelW),
       // Тайминги — как в примере Sipeed: строка 800 + 392 такта гашения, кадр 480 + 53 строки.
       // Допуски ILI6122 (800×480): строка 862..1200 тактов (здесь 1192), кадр 510..650 строк
       // (здесь 533), частота до 50 МГц (здесь 35) — около 55 кадров/с.

@@ -31,7 +31,8 @@ module conv_pipeline #(
     // string во вложенные модули внутри generate.
     // verilog_lint: waive explicit-parameter-storage-type
     parameter KernelFile = "kernels.hex",
-    parameter int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
+    // Разрядность номера ядра — определяется числом ядер.
+    localparam int unsigned SelW = (NumKernels > 1) ? $clog2(NumKernels) : 1
 ) (
     input logic clk_i,
     input logic rst_i,  // синхронный сброс, активный уровень 1
@@ -70,8 +71,7 @@ module conv_pipeline #(
     kernel_rom #(
         .K(K),
         .NumKernels(NumKernels),
-        .InitFile(KernelFile),
-        .SelW(SelW)
+        .InitFile(KernelFile)
     ) u_kernel_rom (
         .clk_i    (clk_i),
         .rst_i    (rst_i),
