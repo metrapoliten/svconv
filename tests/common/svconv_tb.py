@@ -171,3 +171,91 @@ async def dvp_camera(
                     await RisingEdge(pclk)
             dut.cam_href_i.value = 0
             await ClockCycles(pclk, h_blank)
+
+
+class SccbMonitor:
+    """Декодирует транзакции SCCB. lines() возвращает уровни (SIOC, SIOD) — с учётом открытого
+    стока и подтяжки; они выбираются по фронтам clk."""
+
+    def __init__(self, clk, lines) -> None:
+        self.clk = clk
+        self.lines = lines
+        # (такт старта, устройство, регистр, значение)
+        self.writes: list[tuple[int, int, int, int]] = []
+        self.cycle = 0
+
+    async def run(self) -> None:
+        prev_c, prev_d = 1, 1
+        bits: list[int] | None = None
+        start_cycle = 0
+        while True:
+            await RisingEdge(self.clk)
+            self.cycle += 1
+            c, d = self.lines()
+            if c == 1 and prev_c == 1 and prev_d == 1 and d == 0:  # старт
+                assert bits is None, "start inside a transaction"
+                bits, start_cycle = [], self.cycle
+            elif c == 1 and prev_c == 1 and prev_d == 0 and d == 1:  # стоп
+                assert bits is not None and len(bits) == 27, f"stop after {bits} bits"
+                b = [int("".join(map(str, bits[i * 9 : i * 9 + 8])), 2) for i in range(3)]
+                assert all(bits[i * 9 + 8] == 1 for i in range(3)), "ninth bit must be released"
+                self.writes.append((start_cycle, *b))
+                bits = None
+            elif bits is not None and c == 1 and prev_c == 0:  # фронт SIOC
+                # После 27 бит фронт SIOC — часть стопа (SIOD поднимется при высоком SIOC).
+                if len(bits) < 27:
+                    bits.append(d)
+            elif c == 1 and prev_c == 1 and d != prev_d and bits is not None:
+                raise AssertionError("SIOD changed while SIOC is high inside a transaction")
+            prev_c, prev_d = c, d
+
+
+# Длина строки OV7670 в пикселях (даташит, рис. 6: tLINE = 784 tP); окно HSTART..HSTOP — по кругу.
+OV7670_LINE = 784
+
+
+def ov7670_registers(writes: list[tuple[int, int, int, int]]) -> dict[int, int]:
+    """Итоговые значения регистров OV7670 по записям SCCB (последняя запись побеждает)."""
+    regs: dict[int, int] = {}
+    for _, dev, reg, val in writes:
+        assert dev == 0x42, f"write to device {dev:#x}, OV7670 is 0x42"
+        regs[reg] = val
+    return regs
+
+
+def check_ov7670_setup(writes: list[tuple[int, int, int, int]]) -> None:
+    """Проверяет по даташиту OV7670 (v1.4, таблица 5), что итоговая настройка даёт то, чего
+    ждёт dvp_capture: VGA 640×480, RGB565 с полным диапазоном и первым байтом R4..R0 G5..G3
+    (рис. 11), непрерывный PCLK, VSYNC = 1 в начале кадра, HREF = 1 на данных, без
+    масштабирования и деления частоты. Для незаписанных регистров — значения после сброса."""
+    r = ov7670_registers(writes)
+    com7 = r[0x12]
+    assert com7 & 0x80 == 0, f"COM7 = {com7:#04x}: the last write must not reset the sensor"
+    assert com7 & 0x05 == 0x04, f"COM7 = {com7:#04x}: output must be RGB (bit 2 = 1, bit 0 = 0)"
+    assert com7 & 0x38 == 0, f"COM7 = {com7:#04x}: CIF/QVGA/QCIF selected instead of VGA"
+    assert com7 & 0x02 == 0, f"COM7 = {com7:#04x}: color bar is on"
+    com15 = r.get(0x40, 0xC0)
+    assert (com15 >> 4) & 3 == 0b01, f"COM15 = {com15:#04x}: RGB565 needs bits 5:4 = 01"
+    assert (com15 >> 6) & 3 == 0b11, f"COM15 = {com15:#04x}: full range 00..FF needs bits 7:6 = 11"
+    com10 = r.get(0x15, 0x00)
+    assert com10 & 0x20 == 0, f"COM10 = {com10:#04x}: PCLK must run during blanking"
+    assert com10 & 0x10 == 0, f"COM10 = {com10:#04x}: PCLK is reversed"
+    assert com10 & 0x08 == 0, f"COM10 = {com10:#04x}: HREF is reversed"
+    assert com10 & 0x40 == 0, f"COM10 = {com10:#04x}: HREF is replaced by HSYNC"
+    assert com10 & 0x02 == 0, f"COM10 = {com10:#04x}: VSYNC is negative"
+    com3 = r.get(0x0C, 0x00)
+    assert com3 & 0x40 == 0, f"COM3 = {com3:#04x}: output bytes are swapped"
+    assert com3 & 0x0C == 0, f"COM3 = {com3:#04x}: scaling or DCW is on"
+    com14 = r.get(0x3E, 0x00)
+    assert com14 & 0x10 == 0, f"COM14 = {com14:#04x}: PCLK divider or manual scaling is on"
+    clkrc = r.get(0x11, 0x80)
+    assert clkrc & 0x3F == 0, f"CLKRC = {clkrc:#04x}: the clock is prescaled"
+    assert r.get(0x6B, 0x0A) & 0xC0 == 0, "DBLV: the PLL multiplies the clock"
+    href, vref = r.get(0x32, 0x80), r.get(0x03, 0x00)
+    hstart = r[0x17] << 3 | href & 7
+    hstop = r[0x18] << 3 | (href >> 3) & 7
+    vstart = r[0x19] << 2 | vref & 3
+    vstop = r[0x1A] << 2 | (vref >> 2) & 3
+    width = (hstop - hstart) % OV7670_LINE
+    assert width == 640, f"HSTART..HSTOP = {hstart}..{hstop}: {width} pixels, expected 640"
+    assert vstop - vstart == 480, f"VSTART..VSTOP = {vstart}..{vstop}: expected 480 lines"

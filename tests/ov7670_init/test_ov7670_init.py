@@ -8,12 +8,13 @@ from pathlib import Path
 import cocotb
 from cocotb.triggers import ClockCycles, RisingEdge
 
-from svconv_tb import start_clock
+from svconv_tb import SccbMonitor, check_ov7670_setup, start_clock
 
 CLK_FREQ = int(os.environ["CLK_FREQ"])
 MS = CLK_FREQ // 1000
 
-# Ожидаемая таблица — из исходника модуля: тест проверяет передачу и порядок, а не значения.
+# Ожидаемая таблица — из исходника модуля: по ней проверяются передача и порядок записей.
+# Значения ключевых регистров проверяет check_ov7670_setup по даташиту.
 TABLE = [
     (int(reg, 16), int(val, 16))
     for reg, val in re.findall(
@@ -23,50 +24,15 @@ TABLE = [
 ]
 
 
-class SccbMonitor:
-    """Декодирует транзакции SCCB по линиям с открытым стоком (уровень = не oe)."""
-
-    def __init__(self, dut):
-        self.dut = dut
-        self.writes: list[tuple[int, int, int, int]] = []  # (такт старта, устройство, рег, значение)
-        self.cycle = 0
-
-    def lines(self) -> tuple[int, int]:
-        return 1 - int(self.dut.sioc_oe_o.value), 1 - int(self.dut.siod_oe_o.value)
-
-    async def run(self) -> None:
-        prev_c, prev_d = 1, 1
-        bits: list[int] | None = None
-        start_cycle = 0
-        while True:
-            await RisingEdge(self.dut.clk_i)
-            self.cycle += 1
-            c, d = self.lines()
-            if c == 1 and prev_c == 1 and prev_d == 1 and d == 0:  # старт
-                assert bits is None, "start inside a transaction"
-                bits, start_cycle = [], self.cycle
-            elif c == 1 and prev_c == 1 and prev_d == 0 and d == 1:  # стоп
-                assert bits is not None and len(bits) == 27, f"stop after {bits} bits"
-                b = [int("".join(map(str, bits[i * 9 : i * 9 + 8])), 2) for i in range(3)]
-                assert all(bits[i * 9 + 8] == 1 for i in range(3)), "ninth bit must be released"
-                self.writes.append((start_cycle, *b))
-                bits = None
-            elif bits is not None and c == 1 and prev_c == 0:  # фронт SIOC
-                # После 27 бит фронт SIOC — часть стопа (SIOD поднимется при высоком SIOC).
-                if len(bits) < 27:
-                    bits.append(d)
-            elif c == 1 and prev_c == 1 and d != prev_d and bits is not None:
-                raise AssertionError("SIOD changed while SIOC is high inside a transaction")
-            prev_c, prev_d = c, d
-
-
 @cocotb.test()
 async def writes_whole_table(dut):
     start_clock(dut)
     dut.rst_i.value = 1
     await ClockCycles(dut.clk_i, 3)
     dut.rst_i.value = 0
-    monitor = SccbMonitor(dut)
+    monitor = SccbMonitor(
+        dut.clk_i, lambda: (1 - int(dut.sioc_oe_o.value), 1 - int(dut.siod_oe_o.value))
+    )
     cocotb.start_soon(monitor.run())
 
     # Аппаратный сброс: RESET# = 0 не меньше 1 мс.
@@ -87,10 +53,10 @@ async def writes_whole_table(dut):
 
     got = [(dev, reg, val) for _, dev, reg, val in monitor.writes]
     assert len(TABLE) == 78
-    # dvp_capture тактируется от PCLK, поэтому PCLK должен идти и в гашении (COM10[5] = 0).
-    assert [val for reg, val in TABLE if reg == 0x15] == [0x00], "COM10 must keep PCLK running"
     assert got == [(0x42, reg, val) for reg, val in TABLE], "SCCB writes differ from the table"
     # Первая запись — программный сброс, после неё пауза не меньше 10 мс.
     assert TABLE[0] == (0x12, 0x80)
     gap = monitor.writes[1][0] - monitor.writes[0][0]
     assert gap >= 10 * MS, f"pause after soft reset: {gap} cycles"
+    # Смысл итоговых значений — по даташиту, независимо от таблицы в исходнике.
+    check_ov7670_setup(monitor.writes)
