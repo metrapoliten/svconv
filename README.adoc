@@ -69,7 +69,7 @@ toc::[]
 * https://www.gowinsemi.com/[Gowin EDA] (проверено с V1.9.12.04) — синтез,
   размещение, временной анализ;
 * https://github.com/trabucayre/openFPGALoader[openFPGALoader] — загрузка в плату;
-* Python 3.12 или новее с пакетами из `requirements.txt`.
+* Python 3.14 или новее с пакетами из `requirements.txt`.
 
 [source,sh]
 ----

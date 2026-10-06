@@ -7,7 +7,7 @@ on:
 env:
   VERIBLE_VERSION: v0.0-4163-g6cce8f19
   IVERILOG_VERSION: v13_0
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.14"
 
 jobs:
   lint:
