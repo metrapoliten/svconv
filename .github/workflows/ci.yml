@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  VERIBLE_VERSION: v0.0-4163-g6cce8f19
+  IVERILOG_VERSION: v13_0
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install black
+        run: pip install "black>=24.0"
+      - name: Install Verible
+        run: |
+          curl -sSL "https://github.com/chipsalliance/verible/releases/download/${VERIBLE_VERSION}/verible-${VERIBLE_VERSION}-linux-static-x86_64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/verible-${VERIBLE_VERSION}/bin" >> "$GITHUB_PATH"
+      - name: Lint
+        run: make lint
+      - name: Check formatting
+        run: make format
+
+  test:
+    name: Model and module tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Cache Icarus Verilog
+        id: iverilog-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/iverilog
+          key: iverilog-${{ env.IVERILOG_VERSION }}-ubuntu-24.04
+      - name: Build Icarus Verilog
+        if: steps.iverilog-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf gperf flex bison
+          git clone --depth 1 --branch "${IVERILOG_VERSION}" https://github.com/steveicarus/iverilog.git "$RUNNER_TEMP/iverilog-src"
+          cd "$RUNNER_TEMP/iverilog-src"
+          sh autoconf.sh
+          ./configure --prefix="$HOME/iverilog"
+          make -j"$(nproc)"
+          make install
+      - name: Add Icarus Verilog to PATH
+        run: echo "$HOME/iverilog/bin" >> "$GITHUB_PATH"
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+      - name: Run tests
+        run: make test
+
+  formal:
+    name: Formal verification
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+      - name: Prove properties
+        run: make formal
