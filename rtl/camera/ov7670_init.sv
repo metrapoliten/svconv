@@ -7,11 +7,11 @@
 // RESET# активен нулём — по даташиту OV7670 v1.4 (в версии 1.01 полярность указана наоборот).
 // Пауза после сброса по даташиту — не меньше 1 мс; 10 мс взяты с запасом.
 //
-// Таблица регистров (режим VGA 640×480, RGB565) взята из проекта Angelo Jacobo
-// https://github.com/AngeloJacobo/FPGA_OV7670_Camera_Interface (src/camera_interface.v),
-// лицензия MIT, Copyright (c) 2021 Angelo Jacobo. Автор ссылается на
-// https://github.com/jonlwowski012/OV7670_NEXYS4_Verilog, но значения и комментарии записей
-// совпадают с https://github.com/westonb/OV7670-Verilog (курс MIT 6.111) — комментарии оттуда.
+// Таблица регистров (режим VGA 640×480, RGB565) вместе с комментариями записей взята из проекта
+// Angelo Jacobo https://github.com/AngeloJacobo/FPGA_OV7670_Camera_Interface
+// (src/camera_interface.v), лицензия MIT, Copyright (c) 2021 Angelo Jacobo; текст лицензии — в
+// THIRD_PARTY_NOTICES. Те же записи встречаются в https://github.com/westonb/OV7670-Verilog
+// (курс MIT 6.111).
 // Изменения:
 //   - COM10 = 0x00 (PCLK идёт непрерывно) вместо 0x20 (PCLK стоит в гашении, при HREF = 0).
 //     У Angelo PCLK лишь выбирается быстрым системным тактом, а у нас это тактовый сигнал
