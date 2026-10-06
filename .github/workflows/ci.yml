@@ -14,8 +14,8 @@ jobs:
     name: Lint and format
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install black
@@ -34,14 +34,14 @@ jobs:
     name: Model and module tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
       - name: Cache Icarus Verilog
         id: iverilog-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/iverilog
           key: iverilog-${{ env.IVERILOG_VERSION }}-ubuntu-24.04
@@ -67,8 +67,8 @@ jobs:
     name: Formal verification
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
