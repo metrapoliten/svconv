@@ -101,7 +101,9 @@ def pad_kernel(kernel: Kernel, k: int) -> Kernel:
     if k <= 0 or k % 2 == 0:
         raise ValueError(f"window size must be a positive odd number, got {k}")
     if kernel.size > k:
-        raise ValueError(f"{kernel.name}: kernel {kernel.size}x{kernel.size} is larger than window {k}x{k}")
+        raise ValueError(
+            f"{kernel.name}: kernel {kernel.size}x{kernel.size} is larger than window {k}x{k}"
+        )
     pad = (k - kernel.size) // 2
     return Kernel(kernel.name, np.pad(kernel.weights, pad), kernel.shift, kernel.mode)
 

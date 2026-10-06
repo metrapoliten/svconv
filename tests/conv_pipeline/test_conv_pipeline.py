@@ -222,4 +222,6 @@ async def clean_frame_after_reconfiguration(dut):
         src = max(idx for c, idx in in_sofs if c <= sof_cycle)
         kernels, enabled = cfg
         chain = [pad_kernel(KERNELS[name], K) for name, e in zip(kernels, enabled) if e]
-        assert_frames_equal(got, pipeline(frames[src], chain), f"change {n} {cfg}, input frame {src}")
+        assert_frames_equal(
+            got, pipeline(frames[src], chain), f"change {n} {cfg}, input frame {src}"
+        )

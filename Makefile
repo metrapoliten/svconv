@@ -6,7 +6,8 @@
 #                   поэтому идут долго (от нескольких минут до получаса каждый); перед загрузкой
 #                   прошивки в плату
 #   make lint   — линтер verible
-#   make format — проверка форматирования verible (без изменения файлов)
+#   make format — проверка форматирования: verible для SystemVerilog, black для Python (без
+#                 изменения файлов)
 #   make formal — формальная проверка (SymbiYosys, решатель yices): нативный из OSS CAD Suite, если
 #                 задана переменная окружения OSS_CAD_SUITE (каталог распаковки, примерно вдвое
 #                 быстрее), иначе — из пакета yowasp-yosys (requirements.txt)
@@ -44,6 +45,7 @@ lint:
 # --verify работает только для одного файла за запуск.
 format:
 	@set -e; for f in $(SV_SOURCES); do verible-verilog-format --verify $$f; done
+	black --check --quiet .
 
 # Доказательства идут от секунд до ~1.5 минуты (дольше всех — kernel_rom), все вместе — около 3 минут;
 # одно можно запустить так: make formal SBY_FILES=formal/video_timing/video_timing.sby

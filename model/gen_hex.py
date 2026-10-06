@@ -19,7 +19,9 @@ def write_hex(path: Path, data: list[int]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate $readmemh memory init files from the model.")
+    parser = argparse.ArgumentParser(
+        description="Generate $readmemh memory init files from the model."
+    )
     sub = parser.add_subparsers(dest="what", required=True)
 
     kernels = sub.add_parser("kernels", help="convolution kernel ROM")

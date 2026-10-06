@@ -91,9 +91,7 @@ def test_kernel_fits_hardware(name: str) -> None:
 def test_postprocess_rounding_and_clamp() -> None:
     acc = np.array([-20, -1, 0, 7, 8, 9, 4095, 4096, 100000])
     # shift=4: деление на 16 с округлением половины вверх, затем насыщение.
-    np.testing.assert_array_equal(
-        postprocess(acc, 4, "clamp"), [0, 0, 0, 0, 1, 1, 255, 255, 255]
-    )
+    np.testing.assert_array_equal(postprocess(acc, 4, "clamp"), [0, 0, 0, 0, 1, 1, 255, 255, 255])
     np.testing.assert_array_equal(postprocess(acc, 4, "abs"), [1, 0, 0, 0, 1, 1, 255, 255, 255])
 
 
