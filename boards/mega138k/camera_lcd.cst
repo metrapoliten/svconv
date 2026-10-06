@@ -1,7 +1,7 @@
 // Ограничения пинов camera_lcd_top (Tang Mega 138K Pro Dock). Все пины — 3,3 В.
 // Источники: примеры Sipeed TangMega-138KPro-example (led, key_led, dvp_rgb, rgb_screen), сверены со
 // схемой дока TANG_MEGA-138K-Pro_Dock-4071f rev 1.2 (листы FPGA_LCD, FPGA_EXT_CONN.,
-// PERIPHERALS); на плате пока не проверены.
+// PERIPHERALS); проверены на плате.
 
 // Генератор 50 МГц.
 IO_LOC "clk50_i" P16;
